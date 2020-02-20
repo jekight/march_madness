@@ -54,6 +54,12 @@ TourneyResults %>%
   geom_bar(stat = "identity", fill = "green", color = "black") +
   coord_flip()
 
-
+TourneyResults %>%
+  filter(TourneyRound == "Championship Game" & Win == "No") %>%
+  group_by(TeamName) %>%
+  summarise(n = n()) %>%
+  ggplot(aes(x = reorder(TeamName,n), y = n)) +
+  geom_bar(stat = "identity", fill = "green", color = "black") +
+  coord_flip()
 
 
