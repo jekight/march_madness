@@ -1,0 +1,2738 @@
+---
+title: "March Madness Visualizations"
+author: "By: Jeremy Kight"
+date: "Date: 02/19/2020"
+output: html_document
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+	echo = TRUE,
+	message = FALSE,
+	warning = FALSE
+)
+```
+***
+
+# Introduction
+
+|        The goal of any team, regardless of which sport the team plays, is to win the National Championship. In doing so, the team earns the right to claim that they are the number one team at that particular level. In men's college basketball, that means winning the March Madness Tournament. To get into the tournament a team must either win a division one conference (there are 32 division one conferences) or be selected by the NCAA Men's Division 1 Basketball Committee (36 teams or chosesn). In all, there are 68 teams that are in the tournament. Four teams are eliminated in the "play-in" round, leaving 64 teams split into four regions. In each region there are 16 teams that are given seeds 1 through 16. The tournament is single elimination and once each region has a winner, those winners play against each other until only one team remains. The tournament is a daunting task for any team. Once the tournament begins, anything can happen. In 1982, the term March Madness was coined to the tournament due to the major upsets and nail biting games. Now days, it is well known how chaotic the tournament is and in fact, it has turned into a challenge to try and predict the winner of every game. However, this is not an easy task since the odds of predicting all the games is roughly 1 in 9 quintillion! All across the United States, people implement different strategies in picking the winners. Some take a statistical approach, while others go off of gut feelings. Some individuals even go by mascots and/or team colors! All methods experience varying success. However, with improved technology and the understanding of data and how to use it, it may be possible to make better decisions when picking the winners in the March Madness Tournament.
+
+|        For the past few years, Kaggle has partnered with Google to provide a competition which focuses on trying to predict the NCAA March Madness Tournament by utilizing machine learning algorithms. On Kaggle's [website](https://www.kaggle.com/competitions), there are two different competitions concerning the NCAA March Madness bracket predictions: men's basketball and women's basketball. The analysis in this report will focus on men's basketball and what factors could potentially lead to a team's success in the NCAA Tournament. Overall, the main objectives are to determine which regular season statistics have the largest impact on tournament outcomes and show whether or not to factor in regular season rankings into game pick decisions. The analysis below will not guarantee a perfect bracket but it could enable an individual to make more educated predictions on various matchups throughout the tournament.
+
+
+# Successful Teams
+
+Before fully understanding the factors that make teams successful in the March Madness Tournament, the most successful teams must be identified. Of course, the ultimate success in the tournament is cutting down the nets after winning the national championship. Below is a table showing the last 15 teams crowned champions. 
+
+``` {r echo=FALSE, results="hide"}
+library(tidyverse)
+library(scales)
+library(gghighlight)
+library(ggplot2)
+library(knitr)
+library(gridExtra)
+```
+
+``` {r echo=FALSE, results="hide"}
+#Load in data
+CompactResults <- read_csv("data2020/MDataFiles_Stage1/MNCAATourneyCompactResults.csv")
+Teams <- read_csv("data2020/MDataFiles_Stage1/MTeams.csv")
+TourneySeeds <- read_csv("data2020/MDataFiles_Stage1/MNCAATourneySeeds.csv")
+Conferences <- read_csv("data2020/MDataFiles_Stage1/MTeamConferences.csv")
+ConferenceNames <- read_csv("data2020/MDataFiles_Stage1/Conferences.csv")
+MMasseyOrdinals <- read_csv("data2020/MDataFiles_Stage1/MMasseyOrdinals.csv")
+TeamStats <- read_csv("data2020/MDataFiles_Stage1/MRegularSeasonDetailedResults.csv")
+```
+
+``` {r echo=FALSE, results="hide"}
+#Create dataframe to host the tourney results
+TourneyResults <- CompactResults
+
+#Create new feature that will be used in pivot_longer
+TourneyResults$WTeamID_Score = paste(TourneyResults$WTeamID,
+                                      TourneyResults$WScore, sep = "_")
+
+#Create new feature that will be used in pivot_longer
+TourneyResults$LTeamID_Score <- paste(TourneyResults$LTeamID,
+                                      TourneyResults$LScore, sep = "_")
+
+#Use pivot_longer to stack games
+TourneyResults <- TourneyResults %>%
+  pivot_longer(
+    cols = c("WTeamID_Score","LTeamID_Score")) %>%
+  separate(value, into = c("TeamID", "Score"), convert = TRUE)
+
+#Create column to show whether a game was won or not
+TourneyResults$Win <- ifelse(TourneyResults$name == "WTeamID_Score", "Yes","No")
+
+#Join TourneyResults and Teams by TeamID
+TourneyResults <- TourneyResults %>%
+  left_join(Teams, by = "TeamID")
+
+#Delete unnecessary columns
+TourneyResults <- select(TourneyResults, Season:DayNum, TeamID:TeamName)
+
+#Create feature to show what round the game is in
+TourneyResults <- TourneyResults %>%
+  mutate(TourneyRound = ifelse(DayNum %in% c(134, 135), "Play in",
+                          ifelse(DayNum %in% c(136, 137), "First Round",
+                            ifelse(DayNum %in% c(138, 139), "Second Round",
+                              ifelse(DayNum %in% c(143, 144), "Sweet 16",
+                                ifelse(DayNum %in% c(145, 146), "Elite 8",
+                                  ifelse(DayNum == 152, "Final Four", "Championship Game")))))))
+
+#Convert desired columns to Factors
+TourneyResults$DayNum <- as.factor(TourneyResults$DayNum)
+TourneyResults$Win <- as.factor(TourneyResults$Win)
+TourneyResults$TeamName <- as.factor(TourneyResults$TeamName)
+TourneyResults$TourneyRound <- as.factor(TourneyResults$TourneyRound)
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE, fig.height=12,fig.width=8}
+TourneyResults %>%
+  filter(Season >= 2005,TourneyRound == "Championship Game" & Win == "Yes") %>%
+  group_by(TeamName) %>%
+  select(Season,TeamName) %>%
+  kable(align = "cc")
+```
+
+|        One thing to notice is that there are several teams that have won multiple championships. Teams like Duke, North Carolina, and Kentucky are known as powerhouse basketball schools and it is not uncommon for schools like these to go on successfull runs. Successful teams attract the best players because everyone wants the best chance to win a championship. It also gives those players more national recogniton, which means a chance to have higher draft positions (if their performance is exemplary). To get a better idea of which teams have won the most championships since 1985, as well as the teams that have lost the championship game, a simple bar graph can be constructed to compare the success of the schools.
+
+```{r echo=FALSE, warning=FALSE, message=FALSE, fig.width = 10,fig.align = 'center'}
+#Create plot to show the schools with the most championships since 1985
+
+plot1 <- TourneyResults %>%
+  filter(TourneyRound == "Championship Game" & Win == "Yes") %>%
+  group_by(TeamName) %>%
+  summarise(n = n()) %>%
+  ggplot(aes(x = reorder(TeamName,n), y = n)) +
+  geom_bar(stat = "identity", fill = "green", color = "black") +
+  scale_y_continuous(breaks= pretty_breaks()) +
+  labs(x = "School", y = "Number of Wins", title = "Championship Game Wins Since 1985") +
+  coord_flip()
+
+#Create plot to show the schools that lost the most championship games since 1985
+plot2 <- TourneyResults %>%
+  filter(TourneyRound == "Championship Game" & Win == "No") %>%
+  group_by(TeamName) %>%
+  summarise(n = n()) %>%
+  ggplot(aes(x = reorder(TeamName,n), y = n)) +
+  geom_bar(stat = "identity", fill = "green", color = "black") +
+  scale_y_continuous(breaks= pretty_breaks()) +
+  labs(x = "School", y = "Number of Losses", title = "Championship Game Loses Since 1985") +
+  coord_flip()
+
+grid.arrange(plot1, plot2, ncol=2)
+```
+
+There are a few key details in the graphs above. First, Duke has clearly been a force to be reckoned with in the tournament. Duke has the most championship wins during the selected timeframe and the second most loses in the championship game. This means that over a span of 35 years, Duke has been in the championship game 25% of the time. Second, the teams that have won the national championship are more likely to be in at least one other championship game. Meaning that out of all the division 1 basketball teams, only a small portion has demonstrated success in the tournament. This could be helpful, if the factors that make these teams successful can be identified. Next, the teams with the total amount of wins and losses in the tournament will be visualized. 
+
+
+
+```{r echo=FALSE, warning=FALSE, message=FALSE, fig.width = 8, fig.align = 'center'}
+#Create plot to show the schools with the most Tournament wins since 1985
+plot3 <- TourneyResults %>%
+  filter(Win == "Yes") %>%
+  group_by(TeamName) %>%
+  summarise(n = n()) %>%
+  arrange(desc(n)) %>%
+  head(10) %>%
+  ggplot(aes(x = reorder(TeamName,n), y = n)) +
+  geom_bar(stat = "identity", fill = "green", color = "black") +
+  scale_y_continuous(breaks= pretty_breaks()) +
+  labs(x = "School", y = "Number of Wins", title = "Tournament Wins Since 1985") +
+  coord_flip()
+
+#Create plot to show the schools with the most Tournament losses since 1985
+plot4 <- TourneyResults %>%
+  filter(Win == "No") %>%
+  group_by(TeamName) %>%
+  summarise(n = n()) %>%
+  arrange(desc(n)) %>%
+  head(10) %>%
+  ggplot(aes(x = reorder(TeamName,n), y = n)) +
+  geom_bar(stat = "identity", fill = "green", color = "black") +
+  scale_y_continuous(breaks= pretty_breaks()) +
+  labs(x = "School", y = "Number of Losses", title = "Tournament Losses Since 1985") +
+  coord_flip()
+
+grid.arrange(plot3, plot4, ncol=2)
+```
+
+The plot on the right, which shows the teams with the most tournament losses, really communicates which teams have made the most tournaments without winning the national championship. So a team like Kansas has over 80 wins but over 30 losses since 1985. Earlier it was revealed that Kansas has won two titles since 1985 but made it to five championships. Knowing this can be extremely valuable because obviously Kansas experiences success early on in the tournament but seems to struggle in the final rounds. Finding out the similarities and differences between a team like Kansas and a team like Duke could help in making predictions throughout the entire bracket.
+
+
+``` {r echo=FALSE, results="hide"}
+#Join TourneyResults and TourneySeeds by TeamID
+TourneyResults <- TourneyResults %>%
+  left_join(TourneySeeds, by = c("TeamID","Season"))
+  
+#Split region and seed  
+TourneyResults <- TourneyResults %>%
+  separate(Seed, into = c("Region", "Seed"), sep = 1)
+
+#Convert new columns to factors 
+TourneyResults$Region <- as.factor(TourneyResults$Region)
+TourneyResults$Seed <- as.factor(TourneyResults$Seed) 
+```
+
+# Seed and Region Performance
+
+|        Now that the successful schools have been identified, it is time to look at how the various tournament seeds have performed. Remember, there are four regions and each region contains 16 teams. This means that the seed numbers range from 1 through 16. The games in each region are matched with the highest seed (#1 seed) playing against the lowest seed (#16 seed) until all seeds have a match up. The plots below show which seeds have won and loss the most championship games.
+
+```{r echo=FALSE, warning=FALSE, message=FALSE, fig.width = 8,fig.align = 'center'}
+
+#Plot to show which seeds have won the most since 1985
+plot5 <- TourneyResults %>%
+  filter(TourneyRound == "Championship Game" & Win == "Yes") %>%
+  group_by(Seed) %>%
+  summarise(n = n()) %>%
+  ggplot(aes(x = reorder(Seed,n), y = n)) +
+  geom_bar(stat = "identity", fill = "green", color = "black") +
+  scale_y_continuous(breaks= pretty_breaks()) +
+  labs(x = "Seed Number", y = "Number of Wins", title = "Championship Game Wins Since 1985") +
+  coord_flip()
+
+#Plot to show which seeds have loss the most since 1985
+plot6 <- TourneyResults %>%
+  filter(TourneyRound == "Championship Game" & Win == "No") %>%
+  group_by(Seed) %>%
+  summarise(n = n()) %>%
+  ggplot(aes(x = reorder(Seed,n), y = n)) +
+  geom_bar(stat = "identity", fill = "green", color = "black") +
+  scale_y_continuous(breaks= pretty_breaks()) +
+  labs(x = "Seed Number", y = "Number of Losses", title = "Championship Game Losses Since 1985") +
+  coord_flip()
+grid.arrange(plot5, plot6, ncol=2)
+```
+
+It is no surprise the the number 1 seed has the most championship game wins. The number 1 seeds in the tournament are given to the top teams that basketball season. The best teams tend to win more often than not. Since 1985, the championship game has been filled mostly with teams ranked within the top three seeds. Notice that there are not any seeds outside of the top 8 that have played in the national championship. This is not to say that teams ranked 9 through 16 are not winning many games though. The plots below show the amount of tournament wins and losses for each seed. 
+```{r echo=FALSE, warning=FALSE, message=FALSE, fig.width= 10, fig.align = 'center'}
+
+#Plot to show which seeds have won the most since 1985
+plot7 <- TourneyResults %>%
+  filter(Win == "Yes") %>%
+  group_by(Seed) %>%
+  summarise(n = n()) %>%
+  arrange(desc(n)) %>%
+  head(18) %>%
+  ggplot(aes(x = reorder(Seed,n), y = n)) +
+  geom_bar(stat = "identity", fill = "green", color = "black") +
+  scale_y_continuous(breaks= pretty_breaks()) +
+  labs(x = "Seed Number", y = "Number of Wins", title = "Tournament Wins Since 1985") +
+  coord_flip()
+
+#Plot to show which seeds have loss the most since 1985
+plot8 <- TourneyResults %>%
+  filter(Win == "No") %>%
+  group_by(Seed) %>%
+  summarise(n = n()) %>%
+  arrange(desc(n)) %>%
+  head(18) %>%
+  ggplot(aes(x = reorder(Seed,n), y = n)) +
+  geom_bar(stat = "identity", fill = "green", color = "black") +
+  scale_y_continuous(breaks= pretty_breaks()) +
+  labs(x = "Seed Number", y = "Number of Losses", title = "Tournament Losses Since 1985") +
+  coord_flip()
+grid.arrange(plot7, plot8, ncol=2)
+
+```
+
+Not surprisingly, seeds 1 through 8 have won the most tournament games, in their respective order. Seed 10 has won more games than seed 9 and seed 15 has been the worst performing seed, historically. Notice that some numbers have the letters "a" and "b" next to them. This is to signify that those teams were "play-in" teams. The variables were assigned based on Team ID number. It does not appear that being marked "a" or "b" made much impact on deciding who would win or lose in the "play-in" game. Remember that the bracket is split into four different regions. It is worth checking to see if one region has produced more champions than the other three.  
+
+
+
+```{r echo=FALSE, warning=FALSE, message=FALSE, fig.width= 10, fig.align = 'center'}
+
+#Plot to show which region has won the most since 1985
+plot9 <- TourneyResults %>%
+  filter(TourneyRound == "Championship Game" & Win == "Yes") %>%
+  group_by(Region) %>%
+  summarise(n = n()) %>%
+  ggplot(aes(x = reorder(Region,n), y = n)) +
+  geom_bar(stat = "identity", fill = "green", color = "black") +
+  scale_y_continuous(breaks= pretty_breaks()) +
+  labs(x = "Region", y = "Number of Wins", title = "Championship Game Wins Since 1985") +
+  coord_flip()
+plot9
+```
+
+Region X as produced only one more champion than the other regions but overall, it does not appear that region plays a role in determining who will win the championship. Thus, each bracket prediction should be more focused on the actual teams and not the region. 
+
+
+# Conference Performance
+
+|        So far, it has been identified that a hand full of teams have been much more successful in the tournament than the rest of the league. Then, to no surprise, the data shows that the higher a team is seeded in the tournament, the more that team will win. The four various regions did not differentiate the successful teams. However, maybe a team's conference will reveal something useful. In the NCAA, there are 32 different conferences. Each conference is made up of several schools that regularly compete against each other. Occasionally, schools will change conferences depending on a multitude of factors. Some conferences focus heavily on sports, such as the SEC. The SEC has historically produced very good football and baseball programs. Other conferences are known for other achievements in academics or fine arts. For example, the Ivy League Conference is not as well know for their sports as they are for their academics. There is a possibility that the conference a school belongs to could be useful in making predictions. The plots below show which conference has produced the most championship winners and losers since 1985.
+
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+
+#Join TourneyResults and TourneySeeds by TeamID
+TourneyResults <- TourneyResults %>%
+  left_join(Conferences, by = c("TeamID","Season"))
+
+#Join TourneyResults and ConferenceNames by ConfAbbrev
+TourneyResults <- TourneyResults %>%
+  left_join(ConferenceNames, by = "ConfAbbrev")
+
+#Delete ConfAbbrev
+TourneyResults <- select(TourneyResults, -ConfAbbrev)
+
+#Rename Conference Column
+TourneyResults <- rename(TourneyResults, Conference = "Description")
+
+#Convert new columns to factors 
+TourneyResults$Conference <- as.factor(TourneyResults$Conference)
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,fig.width = 10, fig.align = 'center'}
+
+#Plot to show which conferences have won the most since 1985
+plot10 <- TourneyResults %>%
+  filter(TourneyRound == "Championship Game" & Win == "Yes") %>%
+  group_by(Conference) %>%
+  summarise(n = n()) %>%
+  ggplot(aes(x = reorder(Conference,n), y = n)) +
+  geom_bar(stat = "identity", fill = "green", color = "black") +
+  scale_y_continuous(breaks= pretty_breaks()) +
+  labs(x = "Conference", y = "Number of Wins", title = "Championship Wins Since 1985") +
+  coord_flip()
+plot10
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,fig.width = 10, fig.align = 'center'}
+
+#Plot to show which conferences have loss the most since 1985
+plot11 <- TourneyResults %>%
+  filter(TourneyRound == "Championship Game" & Win == "No") %>%
+  group_by(Conference) %>%
+  summarise(n = n()) %>%
+  ggplot(aes(x = reorder(Conference,n), y = n)) +
+  geom_bar(stat = "identity", fill = "green", color = "black") +
+  scale_y_continuous(breaks= pretty_breaks()) +
+  labs(x = "Conference", y = "Number of Losses", title = "Championship Loses Since 1985") +
+  coord_flip()
+plot11
+```
+
+The Atlantic Coast Conference (ACC) and the Big East Conference have produced the most successful teams since 1985, with the ACC being slightly more successful. In fact, most of the champions since 1985 have come from one of these two conferences. Two other notable conferences include the Southeastern Conference (SEC) and the Big 10. Looking at the performance of the Big Ten (Big 10) in the championship game, shows that schools from the Big 10 make it to the championship quite often but fail to win the game that matters the most. Also, note that only a fraction of the conferences have made it to the championship game. This should at least be considered when making predictions. Below, will show how these conferences perform throughout the entire tournament.  
+
+```{r echo=FALSE, warning=FALSE, message=FALSE, fig.width = 10,fig.align = 'center'}
+
+#Plot to show which conferences have won the most since 1985
+plot12 <- TourneyResults %>%
+  filter(Win == "Yes") %>%
+  group_by(Conference) %>%
+  summarise(n = n()) %>%
+  arrange(desc(n)) %>%
+  ggplot(aes(x = reorder(Conference,n), y = n)) +
+  geom_bar(stat = "identity", fill = "green", color = "black") +
+  scale_y_continuous(breaks= pretty_breaks()) +
+  labs(x = "Conference", y = "Number of Wins", title = "Tournament Wins Since 1985") +
+  coord_flip() +
+  theme(text = element_text(size = 7))
+plot12
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE, fig.width = 10, fig.align = 'center'}
+
+#Plot to show which conferences have loss the most since 1985
+plot13 <- TourneyResults %>%
+  filter(Win == "No") %>%
+  group_by(Conference) %>%
+  summarise(n = n()) %>%
+  arrange(desc(n)) %>%
+  ggplot(aes(x = reorder(Conference,n), y = n)) +
+  geom_bar(stat = "identity", fill = "green", color = "black") +
+  scale_y_continuous(breaks= pretty_breaks()) +
+  labs(x = "Conference", y = "Number of Losses", title = "Tournament Losses Since 1985") +
+  coord_flip() +
+  theme(text = element_text(size = 7))
+plot13
+```
+
+When comparing national championships with tournament games, not a lot changes. Conferences that have won more championships have historically won more tournament games in general. Overall, the plots above show that the conference a school belongs to definitely plays a role in tournament performance. 
+
+
+# Top Winning Percentages in Tournament Play
+
+|        Observing the total amount of wins and losses is useful but studying winning percentage may be more beneficial. Knowing a team's winning percentage will give a quantatative measurement during the preditive process. This measurement can be spanned over different time periods which will give different perspectives. For example, the plot below shows the top ten winning percentages in the tournament since 1985. However, before using these results to make predictions, remember that teams that occur in this list could have had very successful tournament runs in the 1980's and have not been relevant recently. This is not to say that the results cannot be useful, but it should be used carefully.
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+
+#Create new dataframe for winning percentage
+schoolwin <- TourneyResults %>%
+  select(Win:TeamName) %>%
+  group_by(Win, TeamName) %>%
+  summarise(Amount = n()) %>%
+  pivot_wider(names_from = Win, values_from = Amount) %>%
+  mutate('Win Percentage' = round(((Yes / (Yes + No))*100),1)) %>%
+  arrange(desc(`Win Percentage`))
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE, fig.width = 10,fig.align = 'center'}
+
+#Plot top ten winning percentages
+plot14 <- schoolwin[0:10,] %>%
+  ggplot(aes(x = reorder(TeamName,`Win Percentage`), y = `Win Percentage`)) +
+  geom_bar(stat = "identity", fill = "green", color = "black") +
+  scale_y_continuous(breaks= pretty_breaks()) +
+  labs(x = "School", y = "Winning Percentage", title = "Winning Percentage in Tournament Since 1985") +
+  coord_flip()
+plot14
+```
+
+One surprise revealed in the graph above is that Connecticut has the greatest winning percentage in the March Madness Tournament and not Duke. However, earlier it was shown that Duke had nearly twice as many wins in the tournament than Connecticut. Putting the information together communicates that Duke has been a top program for a long time and ,more times than not, will have a winning record in the tournament. A school like Connecticut may not participate in the tournament year after year but when they are in the tournament, they typically win the majority of their games. Notice that Loyola-Chicago has come out of nowhere to arrive on the list with the school with the highest winning percentage. One logical explaination for this is that Loyola-Chicago has not mad the tournament very often and in at least one of the years that they appeared in the tournament they won quite a few games but did not make it to the championship. Again, knowing which schools have performed well historically is helpful but it should only be used in conjuction with more recent statistics. The plot below displays the top ten winning percentages within the last ten years.
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+
+#Dataframe for win Percentage from last 10 years
+schoolwin10 <- TourneyResults %>%
+  filter(Season >= 2009) %>%
+  select(Win:TeamName) %>%
+  group_by(Win, TeamName) %>%
+  summarise(Amount = n()) %>%
+  pivot_wider(names_from = Win, values_from = Amount) %>%
+  mutate('Win Percentage' = round(((Yes / (Yes + No))*100),1)) %>%
+  arrange(desc(`Win Percentage`))
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE, fig.width = 10,fig.align = 'center'}
+
+#Plot top ten winning percentage last 10 years
+plot15 <- schoolwin10[0:10,] %>%
+  ggplot(aes(x = reorder(TeamName,`Win Percentage`), y = `Win Percentage`)) +
+  geom_bar(stat = "identity", fill = "green", color = "black") +
+  scale_y_continuous(breaks= pretty_breaks()) +
+  labs(x = "School", y = "Winning Percentage", title = "Winning Percentage in Tournament Since 2009") +
+  coord_flip()
+plot15
+```
+
+Interestingly, Connecticut is still the top school in terms of winning percentage. At number two is South Carolina, which again is probably the result of at least one tournament in which they won the majority of their games. Also, Texas Tech is now on the list due to their championship run last year. While using a school's winning percentage as a feature probably won't carry much weight, it should at least be explored in a model as it could help in predicting tough matchups. 
+
+
+|        The idea of this report was to find which statistics or characteristics the most successful teams in Division 1 basketball share. The plots above revealed which schools have historically experienced the most success in the tournament but it is difficult to differentiate the schools that are consistently good vs the schools with one ore two good years. Thus, the plot below displays the amount of wins vs number of losses in order to identify which teams have consistently been good. 
+
+```{r echo=FALSE, warning=FALSE, message=FALSE, fig.align = 'center'}
+
+#Team Name Map
+plot16 <- schoolwin10 %>%
+  ggplot(aes(No, Yes))+
+  geom_text(aes(label = TeamName), size = 3)+
+  labs(title = "Wins vs Losses Since 2009",
+       x = "Number of Losses", y = "Number of Wins")+
+  theme_minimal()
+plot16
+```
+
+The plot above gives a better picture as to which teams should be highlighted when trying to determine important statistical factors when picking winners and losers. Ideally, teams that have appeared in several tournaments will be more beneficial than teams that have only had one or two tournament appearances. Also, the teams selected need to have impressive winning records. Thus, the following ten teams were chosen:
+
+* Connecticut
+* North Carolina
+* Kentucky
+* Duke
+* Villanova
+* Louisville
+* Kansas
+* Michigan St
+* Florida
+* Michigan
+
+These ten teams will be used to gauge what statstics have been the biggest factors that separates the winning teams from the losing teams. 
+
+
+# Identifying Team Statstics
+
+Before comparing these ten teams, key statistics need to be identified. Instead of looking at data from 1985 to 2019, only the last 10 years will be observed. This is actually essential since the game of basketball changes throughout the years. The game use to be played much slower with a higher emphasis on defense but that no longer seems to be the case. The five statistics below are offensive based ranging from 2009 to 2019. The plots also highlight the differences between the averages of the winning and losing teams.
+
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+
+#Only want to look at last 10 years
+TeamStats09 <- TeamStats %>%
+  filter(Season >= 2009)
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,fig.width= 12,fig.height=8,fig.align = 'center'}
+
+#Average score per game last 10 years
+plot17 <- TeamStats09 %>%
+  select(Season, WScore, LScore) %>%
+  rename(Winner = "WScore", Loser = "LScore") %>%
+  pivot_longer(cols = c("Winner","Loser"), names_to = "Outcome") %>%
+  group_by(Season,Outcome) %>%
+  summarise(Score = round(mean(value),1)) %>%
+  ggplot(aes(x = Season, y = Score, fill = Outcome)) +
+  geom_bar(stat="identity",color = "black", position = "dodge") +
+  scale_x_continuous(breaks = pretty_breaks()) +
+  scale_y_continuous(name = "Score") +
+  labs(x = "Year", y = "Score", title = "Average Score") +
+  coord_flip()
+
+#Average field goals made per game last 10 years
+plot18 <- TeamStats09 %>%
+  select(Season, WFGM, LFGM) %>%
+  rename(Winner = "WFGM", Loser = "LFGM") %>%
+  pivot_longer(cols = c("Winner","Loser"), names_to = "Outcome") %>%
+  group_by(Season,Outcome) %>%
+  summarise(FGM = round(mean(value),1)) %>%
+  ggplot(aes(x = Season, y = FGM, fill = Outcome)) +
+  geom_bar(stat="identity",color = "black", position = "dodge") +
+  scale_x_continuous(breaks = pretty_breaks()) +
+  scale_y_continuous(name = "FGM") +
+  labs(x = "Year", y = "FGM", title = "Field Goals Made") +
+  coord_flip()
+
+#Average 3 pointers made per game last 10 years
+plot19 <- TeamStats09 %>%
+  select(Season, WFGM3, LFGM3) %>%
+  rename(Winner = "WFGM3", Loser = "LFGM3") %>%
+  pivot_longer(cols = c("Winner","Loser"), names_to = "Outcome") %>%
+  group_by(Season,Outcome) %>%
+  summarise(FGM3 = round(mean(value),1)) %>%
+  ggplot(aes(x = Season, y = FGM3, fill = Outcome)) +
+  geom_bar(stat="identity",color = "black", position = "dodge") +
+  scale_x_continuous(breaks = pretty_breaks()) +
+  scale_y_continuous(name = "FGM3") +
+  labs(x = "Year", y = "FGM3", title = "3 Pointers Made") +
+  coord_flip()
+
+#Average free throws made per game last 10 years
+plot20 <- TeamStats09 %>%
+  select(Season, WFTM, LFTM) %>%
+  rename(Winner = "WFTM", Loser = "LFTM") %>%
+  pivot_longer(cols = c("Winner","Loser"), names_to = "Outcome") %>%
+  group_by(Season,Outcome) %>%
+  summarise(FTM = round(mean(value),1)) %>%
+  ggplot(aes(x = Season, y = FTM, fill = Outcome)) +
+  geom_bar(stat="identity",color = "black", position = "dodge") +
+  scale_x_continuous(breaks = pretty_breaks()) +
+  scale_y_continuous(name = "FTM") +
+  labs(x = "Year", y = "FTM", title = "Free Throws Made") +
+  coord_flip()
+
+#Average offensive rebounds per game last 10 years
+plot21 <- TeamStats09 %>%
+  select(Season, WOR, LOR) %>%
+  rename(Winner = "WOR", Loser = "LOR") %>%
+  pivot_longer(cols = c("Winner","Loser"), names_to = "Outcome") %>%
+  group_by(Season,Outcome) %>%
+  summarise(OR = round(mean(value),1)) %>%
+  ggplot(aes(x = Season, y = OR, fill = Outcome)) +
+  geom_bar(stat="identity",color = "black", position = "dodge") +
+  scale_x_continuous(breaks = pretty_breaks()) +
+  scale_y_continuous(name = "OR") +
+  labs(x = "Year", y = "OR", title = "Offensive Rebounds") +
+  coord_flip()
+
+#Average assists per game last 10 years
+plot22 <- TeamStats09 %>%
+  select(Season, WAst, LAst) %>%
+  rename(Winner = "WAst", Loser = "LAst") %>%
+  pivot_longer(cols = c("Winner","Loser"), names_to = "Outcome") %>%
+  group_by(Season,Outcome) %>%
+  summarise(Assists = round(mean(value),1)) %>%
+  ggplot(aes(x = Season, y = Assists, fill = Outcome)) +
+  geom_bar(stat="identity",color = "black", position = "dodge") +
+  scale_x_continuous(breaks = pretty_breaks()) +
+  scale_y_continuous(name = "Assists") +
+  labs(x = "Year", y = "Assists", title = "Average Assists") +
+  coord_flip()
+
+grid.arrange(plot17, plot18, plot19, plot20,plot21,plot22, ncol=2)
+```
+
+Starting with the average score of the winning and losing teams, there is no big surprise. The winning team must average more points because a team has to score more to win. However, the difference in score is pretty substantial. Approximately ten points separate the winning and losing team on average over the years. This connects directly with the average field goals made. In order to score more, a team has to make more field goals. Note that since 2016, teams are making much more field goals compared to seasons in the past. Next, the amount of three pointers made has increased significantly from 2016 and on. This change in offensive strategy could be attributed to the emergence of the Golden State Warriors and their success they experienced in the NBA by shooting and making three pointers at a high percentage. This stlye of play has permeated into college basketball and it appears that the winning teams are doing a better job making more three pointers. The amount of free throws made by both the winning and losing teams has decreased as the amount of three pointers increased. This could be due to the fact that when teams drive towards the basket, the potential to be fouled on the shot goes up. Since teams are driving towards the basket less and instead shooting three pointers, the opportunity to be fouled is reduced. Lastly, offensive rebounds seem to not be helpful. However, one hypothesis for the results displayed is that the winning team is making more of their shots compared to the losing team. Meaning that the losing team has more opportunities for offensive rebounds compared to the winning team. Lastly, the average amount of assists is much greater for the winning teams compared to the losing teams. The amount of assists has increased slightly since 2016 but not significantly. Next, the defensive statistics will be examined. 
+
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,fig.width= 12,fig.height=8,fig.align = 'center'}
+
+#Average defensive rebounds per game last 10 years
+plot23 <- TeamStats09 %>%
+  select(Season, WDR, LDR) %>%
+  rename(Winner = "WDR", Loser = "LDR") %>%
+  pivot_longer(cols = c("Winner","Loser"), names_to = "Outcome") %>%
+  group_by(Season,Outcome) %>%
+  summarise(DR = round(mean(value),1)) %>%
+  ggplot(aes(x = Season, y = DR, fill = Outcome)) +
+  geom_bar(stat="identity",color = "black", position = "dodge") +
+  scale_x_continuous(breaks = pretty_breaks()) +
+  scale_y_continuous(name = "DR") +
+  labs(x = "Year", y = "DR", title = "Defensive Rebounds") +
+  coord_flip()
+
+
+#Average amount of turnovers per game last 10 years
+plot24 <- TeamStats09 %>%
+  select(Season, WTO, LTO) %>%
+  rename(Winner = "WTO", Loser = "LTO") %>%
+  pivot_longer(cols = c("Winner","Loser"), names_to = "Outcome") %>%
+  group_by(Season,Outcome) %>%
+  summarise(TO = round(mean(value),1)) %>%
+  ggplot(aes(x = Season, y = TO, fill = Outcome)) +
+  geom_bar(stat="identity",color = "black", position = "dodge") +
+  scale_x_continuous(breaks = pretty_breaks()) +
+  scale_y_continuous(name = "TO") +
+  labs(x = "Year", y = "TO", title = "Turnovers Per Game") +
+  coord_flip()
+
+#Average number of steals per game last 10 years
+plot25 <- TeamStats09 %>%
+  select(Season, WStl, LStl) %>%
+  rename(Winner = "WStl", Loser = "LStl") %>%
+  pivot_longer(cols = c("Winner","Loser"), names_to = "Outcome") %>%
+  group_by(Season,Outcome) %>%
+  summarise(Stl = round(mean(value),1)) %>%
+  ggplot(aes(x = Season, y = Stl, fill = Outcome)) +
+  geom_bar(stat="identity",color = "black", position = "dodge") +
+  scale_x_continuous(breaks = pretty_breaks()) +
+  scale_y_continuous(name = "Stl") +
+  labs(x = "Year", y = "Stl", title = "Steals Per Game") +
+  coord_flip()
+
+#Average number of blocks per game last 10 years
+plot26 <- TeamStats09 %>%
+  select(Season, WBlk, LBlk) %>%
+  rename(Winner = "WBlk", Loser = "LBlk") %>%
+  pivot_longer(cols = c("Winner","Loser"), names_to = "Outcome") %>%
+  group_by(Season,Outcome) %>%
+  summarise(Blk = round(mean(value),1)) %>%
+  ggplot(aes(x = Season, y = Blk, fill = Outcome)) +
+  geom_bar(stat="identity",color = "black", position = "dodge") +
+  scale_x_continuous(breaks = pretty_breaks()) +
+  scale_y_continuous(name = "Blk") +
+  labs(x = "Year", y = "Blk", title = "Blocks Per Game") +
+  coord_flip()
+
+#Average number of personal fouls per game last 10 years
+plot27 <- TeamStats09 %>%
+  select(Season, WPF, LPF) %>%
+  rename(Winner = "WPF", Loser = "LPF") %>%
+  pivot_longer(cols = c("Winner","Loser"), names_to = "Outcome") %>%
+  group_by(Season,Outcome) %>%
+  summarise(PF = round(mean(value),1)) %>%
+  ggplot(aes(x = Season, y = PF, fill = Outcome)) +
+  geom_bar(stat="identity",color = "black", position = "dodge") +
+  scale_x_continuous(breaks = pretty_breaks()) +
+  scale_y_continuous(name = "PF") +
+  labs(x = "Year", y = "PF", title = "Personal Fouls") +
+  coord_flip()
+grid.arrange(plot23, plot24, plot25, plot26,plot27, ncol=2)
+```
+
+The first defensive statistic shows that defensive rebounds has a big difference between the winning and losing teams (almost 10 rebounds). This does make sense because the losing team is probably missing more shots, which gives the other team a chance to secure a defensive rebound. The next statistic is not exactly a defensive statistic (in fact, it is recorded based on the offensive team), however, it shows that the winning team commits less turnovers while forcing the other team to turn the ball over more. One of the key statistics for turnovers is steals, which the winning team does a better job doing. Also blocks is another statistic that leads to turnovers. While steals and blocks seem to favor the winning team heavily, after taking a closer look at the x-axis it actually is pretty close. Between the winner and loser only one block and one steal separates them. Still, this is an average over an entire season, so it makes sense that the averages are closer. At last, the amount of personal fouls committed by each team is much greater for the losing team. While this is partially due to sloppy defense, it could also be due to the fact that the losing team will intentionally foul the other team in order to control the game clock. Which results in the losing team committing more fouls than the winning team on average. 
+
+
+# Comparing Team Stats
+
+Now that there is an idea of what key statistics the winning teams share during the season, it is time to see how the chosen teams compare with the rest of the league. Also, instead of taking the entire season into account, only the second half of the year will be considered. This will take into account the teams that started playing their best basketball right before the tournament. The idea is that teams that win in the tournament are probably playing better before the tournament starts and their performance carries over into the actual tournament. This could explain why small low seeded teams upset higher seeded teams. The plots below display the average score per game during the second half of the season for the years 2009, 2013, 2017, and 2019.
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+
+BeforeTourney <- TeamStats 
+
+#Create new feature that will be used in pivot_longer
+BeforeTourney$WTeamID_Score = paste(BeforeTourney$WTeamID,
+                                    BeforeTourney$WScore, sep = "_")
+
+#Create new feature that will be used in pivot_longer
+BeforeTourney$LTeamID_Score <- paste(BeforeTourney$LTeamID,
+                                     BeforeTourney$LScore, sep = "_")
+
+
+#Use pivot_longer to stack games
+BeforeTourney <- BeforeTourney %>%
+  pivot_longer(
+    cols = c("WTeamID_Score","LTeamID_Score")) %>%
+  separate(value, into = c("TeamID", "Score"), convert = TRUE)
+
+#Create column to show whether a game was won or not
+BeforeTourney$Win <- ifelse(BeforeTourney$name == "WTeamID_Score", "Yes","No")
+
+#Create column to show whether a game was won or not
+BeforeTourney$Winner <- ifelse(BeforeTourney$Win == "Yes", 1, 0)
+
+#Create column to show whether a game was won or not
+BeforeTourney$Loser <- ifelse(BeforeTourney$Win == "No", 1, 0)
+
+#Create column to show whether a game was won or not
+BeforeTourney$Opp_Win <- ifelse(BeforeTourney$Winner == 0, 1, 0)
+
+#Create column to show whether a game was won or not
+BeforeTourney$Opp_Lose <- ifelse(BeforeTourney$Winner == 1, 1, 0)
+
+BeforeTourney <- BeforeTourney %>%
+  left_join(Teams, by = "TeamID") %>%
+  select(Season:DayNum, WFGM:LPF,TeamID:Score, Winner:TeamName) %>%
+  filter(DayNum >= 75)
+```
+
+
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,fig.width= 12,fig.height=8,fig.align = 'center'}
+
+#Average score month before tournament
+plot28 <- BeforeTourney %>%
+  filter(Season == 2009) %>%
+  select(Season,Score:TeamName) %>%
+  group_by(TeamName) %>%
+  summarise(Score = round(mean(Score),1), 
+            Games = sum(Winner + Loser),
+            Wins = sum(Winner)) %>%
+  ggplot() +
+  geom_point(mapping = aes(x = Wins, y = Score)) +
+  gghighlight(TeamName == "Connecticut" |
+              TeamName == "North Carolina" |
+              TeamName ==  "Kentucky"|
+              TeamName =="Duke"|
+              TeamName =="Villanova"|
+              TeamName =="Louisville"|
+              TeamName =="Kansas"|
+              TeamName =="Michigan St"|
+              TeamName =="Florida"|
+              TeamName =="Michigan",label_key = TeamName) +
+  labs(x = "Wins", y = "Score", title = "Average Score Per Game 2009")+
+  theme(text = element_text(size = 7))
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,fig.width= 12,fig.height=8,fig.align = 'center'}
+#Average score month before tournament
+plot29 <- BeforeTourney %>%
+  filter(Season == 2013) %>%
+  select(Season,Score:TeamName) %>%
+  group_by(TeamName) %>%
+  summarise(Score = round(mean(Score),1), 
+            Games = sum(Winner + Loser),
+            Wins = sum(Winner)) %>%
+  ggplot() +
+  geom_point(mapping = aes(x = Wins, y = Score)) +
+  gghighlight(TeamName == "Connecticut" |
+                TeamName == "North Carolina" |
+                TeamName ==  "Kentucky"|
+                TeamName == "Duke"|
+                TeamName =="Villanova"|
+                TeamName =="Louisville"|
+                TeamName =="Kansas"|
+                TeamName =="Michigan St"|
+                TeamName =="Florida"|
+                TeamName =="Michigan",label_key = TeamName) +
+  labs(x = "Wins", y = "Score", title = "Average Score Per Game 2013")+
+  theme(text = element_text(size = 7))
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,fig.width= 12,fig.height=8,fig.align = 'center'}
+#Average score month before tournament
+plot30 <- BeforeTourney %>%
+  filter(Season == 2017) %>%
+  select(Season,Score:TeamName) %>%
+  group_by(TeamName) %>%
+  summarise(Score = round(mean(Score),1), 
+            Games = sum(Winner + Loser),
+            Wins = sum(Winner)) %>%
+  ggplot() +
+  geom_point(mapping = aes(x = Wins, y = Score)) +
+  gghighlight(TeamName == "Connecticut" |
+                TeamName == "North Carolina" |
+                TeamName ==  "Kentucky"|
+                TeamName == "Duke"|
+                TeamName =="Villanova"|
+                TeamName =="Louisville"|
+                TeamName =="Kansas"|
+                TeamName =="Michigan St"|
+                TeamName =="Florida"|
+                TeamName =="Michigan",label_key = TeamName) +
+  labs(x = "Wins", y = "Score", title = "Average Score Per Game 2017")+
+  theme(text = element_text(size = 7))
+```
+
+
+
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,fig.width= 12,fig.height=8,fig.align = 'center'}
+#Average score month before tournament
+plot31 <- BeforeTourney %>%
+  filter(Season == 2019) %>%
+  select(Season,Score:TeamName) %>%
+  group_by(TeamName) %>%
+  summarise(Score = round(mean(Score),1), 
+            Games = sum(Winner + Loser),
+            Wins = sum(Winner)) %>%
+  ggplot() +
+  geom_point(mapping = aes(x = Wins, y = Score)) +
+  gghighlight(TeamName == "Connecticut" |
+                TeamName == "North Carolina" |
+                TeamName ==  "Kentucky"|
+                TeamName == "Duke"|
+                TeamName =="Villanova"|
+                TeamName =="Louisville"|
+                TeamName =="Kansas"|
+                TeamName =="Michigan St"|
+                TeamName =="Florida"|
+                TeamName =="Michigan",label_key = TeamName) +
+  labs(x = "Wins", y = "Score", title = "Average Score Per Game 2019")+
+  theme(text = element_text(size = 7))
+grid.arrange(plot28,plot29,plot30,plot31,ncol = 2)
+```
+
+Based on the four graphs above, there seem to be a correlation between the score and amount of wins. The higher a team's average score is, the more wins that teams will have. Again, the teams labeled in the plots are the teams that have the highest winning percentage in the March Madness Tournament. It appears that while they may not have the most wins or the highest average score, they almost always seem to be clustered in the top third (except for 2009, where they appeared to be more scattered). Next, the amount of three pointers made will be examined.
+
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,fig.width= 12,fig.height=8,fig.align = 'center'}
+#Three pointers made per game month before tournament
+plot32 <- BeforeTourney %>%
+  filter(Season == 2009) %>%
+  select(Season,WFGM3,WFGA3,LFGM3,LFGA3,Winner:TeamName) %>%
+  group_by(TeamName) %>%
+  mutate(FGM3 = (WFGM3*Winner)+(LFGM3*Loser),
+         FGA3 = (WFGA3*Winner)+(LFGA3*Loser), 
+         avg3pt = (FGM3/FGA3)*100) %>%
+  summarise(avg = round(mean(avg3pt),1), 
+            Games = sum(Winner + Loser),
+            Wins = sum(Winner)) %>%
+  ggplot() +
+  geom_point(mapping = aes(x = Wins, y = avg)) +
+  gghighlight(TeamName == "Connecticut" |
+                TeamName == "North Carolina" |
+                TeamName ==  "Kentucky"|
+                TeamName =="Duke"|
+                TeamName =="Villanova"|
+                TeamName =="Louisville"|
+                TeamName =="Kansas"|
+                TeamName =="Michigan St"|
+                TeamName =="Florida"|
+                TeamName =="Michigan",label_key = TeamName) +
+  labs(x = "Wins", y = "Percent", title = "Three Point Average Per Game 2009") +
+  theme(text = element_text(size = 7))
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,fig.width= 12,fig.height=8,fig.align = 'center'}
+#Three pointers made per game month before tournament
+plot33 <- BeforeTourney %>%
+  filter(Season == 2013) %>%
+  select(Season,WFGM3,WFGA3,LFGM3,LFGA3,Winner:TeamName) %>%
+  group_by(TeamName) %>%
+  mutate(FGM3 = (WFGM3*Winner)+(LFGM3*Loser),
+         FGA3 = (WFGA3*Winner)+(LFGA3*Loser), 
+         avg3pt = (FGM3/FGA3)*100) %>%
+  summarise(avg = round(mean(avg3pt),1), 
+            Games = sum(Winner + Loser),
+            Wins = sum(Winner)) %>%
+  ggplot() +
+  geom_point(mapping = aes(x = Wins, y = avg)) +
+  gghighlight(TeamName == "Connecticut" |
+                TeamName == "North Carolina" |
+                TeamName ==  "Kentucky"|
+                TeamName =="Duke"|
+                TeamName =="Villanova"|
+                TeamName =="Louisville"|
+                TeamName =="Kansas"|
+                TeamName =="Michigan St"|
+                TeamName =="Florida"|
+                TeamName =="Michigan",label_key = TeamName) +
+  labs(x = "Wins", y = "Percent", title = "Three Point Average Per Game 2013") +
+  theme(text = element_text(size = 7))
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,fig.width= 12,fig.height=8,fig.align = 'center'}
+#Three pointers made per game month before tournament
+plot34 <- BeforeTourney %>%
+  filter(Season == 2017) %>%
+  select(Season,WFGM3,WFGA3,LFGM3,LFGA3,Winner:TeamName) %>%
+  group_by(TeamName) %>%
+  mutate(FGM3 = (WFGM3*Winner)+(LFGM3*Loser),
+         FGA3 = (WFGA3*Winner)+(LFGA3*Loser), 
+         avg3pt = (FGM3/FGA3)*100) %>%
+  summarise(avg = round(mean(avg3pt),1), 
+            Games = sum(Winner + Loser),
+            Wins = sum(Winner)) %>%
+  ggplot() +
+  geom_point(mapping = aes(x = Wins, y = avg)) +
+  gghighlight(TeamName == "Connecticut" |
+                TeamName == "North Carolina" |
+                TeamName ==  "Kentucky"|
+                TeamName =="Duke"|
+                TeamName =="Villanova"|
+                TeamName =="Louisville"|
+                TeamName =="Kansas"|
+                TeamName =="Michigan St"|
+                TeamName =="Florida"|
+                TeamName =="Michigan",label_key = TeamName) +
+  labs(x = "Wins", y = "Percent", title = "Three Point Average Per Game 2017") +
+  theme(text = element_text(size = 7))
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,fig.width= 12,fig.height=8,fig.align = 'center'}
+#Three pointers made per game month before tournament
+plot35 <- BeforeTourney %>%
+  filter(Season == 2019) %>%
+  select(Season,WFGM3,WFGA3,LFGM3,LFGA3,Winner:TeamName) %>%
+  group_by(TeamName) %>%
+  mutate(FGM3 = (WFGM3*Winner)+(LFGM3*Loser),
+         FGA3 = (WFGA3*Winner)+(LFGA3*Loser), 
+         avg3pt = (FGM3/FGA3)*100) %>%
+  summarise(avg = round(mean(avg3pt),1), 
+            Games = sum(Winner + Loser),
+            Wins = sum(Winner)) %>%
+  ggplot() +
+  geom_point(mapping = aes(x = Wins, y = avg)) +
+  gghighlight(TeamName == "Connecticut" |
+                TeamName == "North Carolina" |
+                TeamName ==  "Kentucky"|
+                TeamName =="Duke"|
+                TeamName =="Villanova"|
+                TeamName =="Louisville"|
+                TeamName =="Kansas"|
+                TeamName =="Michigan St"|
+                TeamName =="Florida"|
+                TeamName =="Michigan",label_key = TeamName) +
+  labs(x = "Wins", y = "Percent", title = "Three Point Average Per Game 2019") +
+  theme(text = element_text(size = 7))
+grid.arrange(plot32,plot33,plot34,plot35)
+```
+
+The plots above are interesting. In the years 2009 and 2013, it appeared there was a slight correlation between the amount of three pointers made vs the number of wins. However the years 2017 and 2019 do not show a correlation. This could be due to the majority of college teams playing with a similar strategy. Most teams now focus on three point shooting which is just making a more even playing field.
+
+
+The next statistic that will be examined is the Effective Field Goal Percentage (EFG%). This metric is similar to Field Goal Percentage, which measures the amount of made shots vs amount of missed shots. However, the EFG% takes into account three point percentage. This is useful because it was already seen earlier that more three pointers are being made every year (meaning more three point shots are being taken) and it is well known that three point shots are more difficult than two point shots. 
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,fig.width= 12,fig.height=8,fig.align = 'center'}
+#EFG% average per game month before tournament
+plot36 <- BeforeTourney %>%
+  filter(Season == 2009) %>%
+  select(Season,WFGM,LFGM,WFGM3,LFGM3,WFGA,LFGA,Winner:TeamName) %>%
+  group_by(TeamName) %>%
+  mutate(FGM2 = ((WFGM*Winner)-(WFGM3*Winner)+(LFGM*Loser)-(LFGM3*Loser)),
+         FGM3 = (WFGM3*Winner)+(LFGM3*Loser),
+         FGA = (WFGA*Winner)+(LFGA*Loser),
+         EFG = ((FGM2+(1.5*FGM3))/FGA)*100) %>%
+  summarise(EFG = round(mean(EFG),3),
+            Games = sum(Winner + Loser),
+            Wins = sum(Winner)) %>%
+  ggplot() +
+  geom_point(mapping = aes(x = Wins, y = EFG)) +
+  gghighlight(TeamName == "Connecticut" |
+                TeamName == "North Carolina" |
+                TeamName ==  "Kentucky"|
+                TeamName =="Duke"|
+                TeamName =="Villanova"|
+                TeamName =="Louisville"|
+                TeamName =="Kansas"|
+                TeamName =="Michigan St"|
+                TeamName =="Florida"|
+                TeamName =="Michigan",label_key = TeamName) +
+  labs(x = "Wins", y = "Percent", title = "Average EFG Percent Per Game 2009") + 
+  theme(text = element_text(size = 7))
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,fig.width= 12,fig.height=8,fig.align = 'center'}
+#EFG% average per game month before tournament
+plot37 <- BeforeTourney %>%
+  filter(Season == 2013) %>%
+  select(Season,WFGM,LFGM,WFGM3,LFGM3,WFGA,LFGA,Winner:TeamName) %>%
+  group_by(TeamName) %>%
+  mutate(FGM2 = ((WFGM*Winner)-(WFGM3*Winner)+(LFGM*Loser)-(LFGM3*Loser)),
+         FGM3 = (WFGM3*Winner)+(LFGM3*Loser),
+         FGA = (WFGA*Winner)+(LFGA*Loser),
+         EFG = ((FGM2+(1.5*FGM3))/FGA)*100) %>%
+  summarise(EFG = round(mean(EFG),3),
+            Games = sum(Winner + Loser),
+            Wins = sum(Winner)) %>%
+  ggplot() +
+  geom_point(mapping = aes(x = Wins, y = EFG)) +
+  gghighlight(TeamName == "Connecticut" |
+                TeamName == "North Carolina" |
+                TeamName ==  "Kentucky"|
+                TeamName =="Duke"|
+                TeamName =="Villanova"|
+                TeamName =="Louisville"|
+                TeamName =="Kansas"|
+                TeamName =="Michigan St"|
+                TeamName =="Florida"|
+                TeamName =="Michigan",label_key = TeamName) +
+  labs(x = "Wins", y = "Percent", title = "Average EFG Percent Per Game 2013") + 
+  theme(text = element_text(size = 7))
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,fig.width= 12,fig.height=8,fig.align = 'center'}
+#EFG% average per game month before tournament
+plot38 <- BeforeTourney %>%
+  filter(Season == 2017) %>%
+  select(Season,WFGM,LFGM,WFGM3,LFGM3,WFGA,LFGA,Winner:TeamName) %>%
+  group_by(TeamName) %>%
+  mutate(FGM2 = ((WFGM*Winner)-(WFGM3*Winner)+(LFGM*Loser)-(LFGM3*Loser)),
+         FGM3 = (WFGM3*Winner)+(LFGM3*Loser),
+         FGA = (WFGA*Winner)+(LFGA*Loser),
+         EFG = ((FGM2+(1.5*FGM3))/FGA)*100) %>%
+  summarise(EFG = round(mean(EFG),3),
+            Games = sum(Winner + Loser),
+            Wins = sum(Winner)) %>%
+  ggplot() +
+  geom_point(mapping = aes(x = Wins, y = EFG)) +
+  gghighlight(TeamName == "Connecticut" |
+                TeamName == "North Carolina" |
+                TeamName ==  "Kentucky"|
+                TeamName =="Duke"|
+                TeamName =="Villanova"|
+                TeamName =="Louisville"|
+                TeamName =="Kansas"|
+                TeamName =="Michigan St"|
+                TeamName =="Florida"|
+                TeamName =="Michigan",label_key = TeamName) +
+  labs(x = "Wins", y = "Percent", title = "Average EFG Percent Per Game 2017") + 
+  theme(text = element_text(size = 7))
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,fig.width= 12,fig.height=8,fig.align = 'center'}
+#EFG% average per game month before tournament
+plot39 <- BeforeTourney %>%
+  filter(Season == 2019) %>%
+  select(Season,WFGM,LFGM,WFGM3,LFGM3,WFGA,LFGA,Winner:TeamName) %>%
+  group_by(TeamName) %>%
+  mutate(FGM2 = ((WFGM*Winner)-(WFGM3*Winner)+(LFGM*Loser)-(LFGM3*Loser)),
+         FGM3 = (WFGM3*Winner)+(LFGM3*Loser),
+         FGA = (WFGA*Winner)+(LFGA*Loser),
+         EFG = ((FGM2+(1.5*FGM3))/FGA)*100) %>%
+  summarise(EFG = round(mean(EFG),3),
+            Games = sum(Winner + Loser),
+            Wins = sum(Winner)) %>%
+  ggplot() +
+  geom_point(mapping = aes(x = Wins, y = EFG)) +
+  gghighlight(TeamName == "Connecticut" |
+                TeamName == "North Carolina" |
+                TeamName ==  "Kentucky"|
+                TeamName =="Duke"|
+                TeamName =="Villanova"|
+                TeamName =="Louisville"|
+                TeamName =="Kansas"|
+                TeamName =="Michigan St"|
+                TeamName =="Florida"|
+                TeamName =="Michigan",label_key = TeamName) +
+  labs(x = "Wins", y = "Percent", title = "Average EFG Percent Per Game 2019") + 
+  theme(text = element_text(size = 7))
+grid.arrange(plot36,plot37,plot38,plot39, ncol = 2)
+```
+
+There is a correlation between EFG% and number of wins experienced during the second half of the season. The higher a team's EFG%, the more wins that team typically will have. Looking at the ten selected teams with a high winning percentage in the tournament shows that to be successful in the tournament, a team needs to have a decent EFG%. This should be a feature when picking winners in a March Madness Bracket.
+
+
+Next, the amount of field goals attempted will be examined to see if this could be a useful feature in determining winners. As seen below, it does not appear that the amount of field goals taken relates to who wins and losses. There also is not really a pattern seen in the selected teams either. Thus, it would probably not be too useful is using the amount of field goals attempted to determine the future winners. 
+```{r echo=FALSE, warning=FALSE, message=FALSE,fig.width= 12,fig.height=8,fig.align = 'center'}
+#Field goals attempted per game month before tournament
+plot40 <- BeforeTourney %>%
+  filter(Season == 2009) %>%
+  select(Season,WFGA,LFGA,Winner:TeamName) %>%
+  group_by(TeamName) %>%
+  mutate(FGA = (WFGA*Winner)+(LFGA*Loser)) %>%
+  summarise(FGA = round(mean(FGA),3),
+            Games = sum(Winner + Loser),
+            Wins = sum(Winner)) %>%
+  ggplot() +
+  geom_point(mapping = aes(x = Wins, y = FGA)) +
+  gghighlight(TeamName == "Connecticut" |
+                TeamName == "North Carolina" |
+                TeamName ==  "Kentucky"|
+                TeamName =="Duke"|
+                TeamName =="Villanova"|
+                TeamName =="Louisville"|
+                TeamName =="Kansas"|
+                TeamName =="Michigan St"|
+                TeamName =="Florida"|
+                TeamName =="Michigan",label_key = TeamName) +
+  labs(x = "Wins", y = "FGA", title = "Average Field Goals Attempted Per Game 2009") +
+  theme(text = element_text(size = 7))
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,fig.width= 12,fig.height=8,fig.align = 'center'}
+#Field goals attempted per game month before tournament
+plot41 <- BeforeTourney %>%
+  filter(Season == 2013) %>%
+  select(Season,WFGA,LFGA,Winner:TeamName) %>%
+  group_by(TeamName) %>%
+  mutate(FGA = (WFGA*Winner)+(LFGA*Loser)) %>%
+  summarise(FGA = round(mean(FGA),3),
+            Games = sum(Winner + Loser),
+            Wins = sum(Winner)) %>%
+  ggplot() +
+  geom_point(mapping = aes(x = Wins, y = FGA)) +
+  gghighlight(TeamName == "Connecticut" |
+                TeamName == "North Carolina" |
+                TeamName ==  "Kentucky"|
+                TeamName =="Duke"|
+                TeamName =="Villanova"|
+                TeamName =="Louisville"|
+                TeamName =="Kansas"|
+                TeamName =="Michigan St"|
+                TeamName =="Florida"|
+                TeamName =="Michigan",label_key = TeamName) +
+  labs(x = "Wins", y = "FGA", title = "Average Field Goals Attempted Per Game 2013") +
+  theme(text = element_text(size = 7))
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,fig.width= 12,fig.height=8,fig.align = 'center'}
+#Field goals attempted per game month before tournament
+plot42 <- BeforeTourney %>%
+  filter(Season == 2017) %>%
+  select(Season,WFGA,LFGA,Winner:TeamName) %>%
+  group_by(TeamName) %>%
+  mutate(FGA = (WFGA*Winner)+(LFGA*Loser)) %>%
+  summarise(FGA = round(mean(FGA),3),
+            Games = sum(Winner + Loser),
+            Wins = sum(Winner)) %>%
+  ggplot() +
+  geom_point(mapping = aes(x = Wins, y = FGA)) +
+  gghighlight(TeamName == "Connecticut" |
+                TeamName == "North Carolina" |
+                TeamName ==  "Kentucky"|
+                TeamName =="Duke"|
+                TeamName =="Villanova"|
+                TeamName =="Louisville"|
+                TeamName =="Kansas"|
+                TeamName =="Michigan St"|
+                TeamName =="Florida"|
+                TeamName =="Michigan",label_key = TeamName) +
+  labs(x = "Wins", y = "FGA", title = "Average Field Goals Attempted Per Game 2017") +
+  theme(text = element_text(size = 7))
+```
+
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,fig.width= 12,fig.height=8,fig.align = 'center'}
+#Field goals attempted per game month before tournament
+plot43 <- BeforeTourney %>%
+  filter(Season == 2019) %>%
+  select(Season,WFGA,LFGA,Winner:TeamName) %>%
+  group_by(TeamName) %>%
+  mutate(FGA = (WFGA*Winner)+(LFGA*Loser)) %>%
+  summarise(FGA = round(mean(FGA),3),
+            Games = sum(Winner + Loser),
+            Wins = sum(Winner)) %>%
+  ggplot() +
+  geom_point(mapping = aes(x = Wins, y = FGA)) +
+  gghighlight(TeamName == "Connecticut" |
+                TeamName == "North Carolina" |
+                TeamName ==  "Kentucky"|
+                TeamName =="Duke"|
+                TeamName =="Villanova"|
+                TeamName =="Louisville"|
+                TeamName =="Kansas"|
+                TeamName =="Michigan St"|
+                TeamName =="Florida"|
+                TeamName =="Michigan",label_key = TeamName) +
+  labs(x = "Wins", y = "FGA", title = "Average Field Goals Attempted Per Game 2019") +
+  theme(text = element_text(size = 7))
+grid.arrange(plot40,plot41,plot42,plot43, ncol = 2)
+```
+
+
+
+Seeing how important offense is to the game of basketball at the moment, it is fair to hypothesize that offensive efficiency is probably an important statistic. Offensive efficiency is an advanced statistic which can be calculated using the following equation:
+
+$$Offensive\:Efficiency = \frac{Possessions}{Score}*100\%$$
+
+here the number of possessions can be found with the formula:
+
+$$Possessions = {(Field Goals Attempted-Offensive Rebounds)+TurnOvers+(0.44*FreeThrowsAttempted)}$$
+Looking at the plots below, it appears that the lower the Offensive Efficiency the more wins a team will obtain. While this seems counterintuitive, some outside the box thinking must be applied. Looking at the formula for Offensive Efficiency shows Possessions in the numerator and Score in the denominator. This means that if possessions is greater than score, then the Offensive Efficiency will be greater than 100%. The ten teams with the highest winning percentage in the tournament had Offensive Efficiencies less that 100% (closer to 90%). This means that those teams were score more on less possessions, which is a characteristic of winning teams. Now the plots below make a little more sense.
+
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,fig.width= 12,fig.height=8,fig.align = 'center'}
+#Offense efficiency average per game month before tournament
+plot44 <- BeforeTourney %>%
+  filter(Season == 2009) %>%
+  select(Season,WFGA,LFGA,WOR,LOR,WTO,LTO,WFTA,LFTA,Score:TeamName) %>%
+  group_by(TeamName) %>%
+  mutate(FGA = (WFGA*Winner)+(LFGA*Loser),
+         OR = (WOR*Winner)+(LOR*Loser),
+         TO = (WTO*Winner)+(LTO*Loser), 
+         FTA = (WFTA*Winner)+(LFTA*Loser),
+         Poss = ((FGA-OR)+TO+(0.44*FTA)), 
+         Off = (Poss/Score)*100 ) %>%
+  summarise(Off = mean(Off),
+            Games = sum(Winner + Loser),
+            Wins = sum(Winner)) %>%
+  ggplot() +
+  geom_point(mapping = aes(x = Wins, y = Off)) +
+  gghighlight(TeamName == "Connecticut" |
+                TeamName == "North Carolina" |
+                TeamName ==  "Kentucky"|
+                TeamName =="Duke"|
+                TeamName =="Villanova"|
+                TeamName =="Louisville"|
+                TeamName =="Kansas"|
+                TeamName =="Michigan St"|
+                TeamName =="Florida"|
+                TeamName =="Michigan",label_key = TeamName) +
+  labs(x = "Wins", y = "Percent", title = "Average Offensive Efficiency Per Game 2009") +
+  theme(text = element_text(size = 7))
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,fig.width= 12,fig.height=8,fig.align = 'center'}
+#Offense efficiency average per game month before tournament
+plot45 <- BeforeTourney %>%
+  filter(Season == 2013) %>%
+  select(Season,WFGA,LFGA,WOR,LOR,WTO,LTO,WFTA,LFTA,Score:TeamName) %>%
+  group_by(TeamName) %>%
+  mutate(FGA = (WFGA*Winner)+(LFGA*Loser),
+         OR = (WOR*Winner)+(LOR*Loser),
+         TO = (WTO*Winner)+(LTO*Loser), 
+         FTA = (WFTA*Winner)+(LFTA*Loser),
+         Poss = ((FGA-OR)+TO+(0.44*FTA)), 
+         Off = (Poss/Score)*100 ) %>%
+  summarise(Off = mean(Off),
+            Games = sum(Winner + Loser),
+            Wins = sum(Winner)) %>%
+  ggplot() +
+  geom_point(mapping = aes(x = Wins, y = Off)) +
+  gghighlight(TeamName == "Connecticut" |
+                TeamName == "North Carolina" |
+                TeamName ==  "Kentucky"|
+                TeamName =="Duke"|
+                TeamName =="Villanova"|
+                TeamName =="Louisville"|
+                TeamName =="Kansas"|
+                TeamName =="Michigan St"|
+                TeamName =="Florida"|
+                TeamName =="Michigan",label_key = TeamName) +
+  labs(x = "Wins", y = "Percent", title = "Average Offensive Efficiency Per Game 2013") +
+  theme(text = element_text(size = 7))
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,fig.width= 12,fig.height=8,fig.align = 'center'}
+#Offense efficiency average per game month before tournament
+plot46 <- BeforeTourney %>%
+  filter(Season == 2017) %>%
+  select(Season,WFGA,LFGA,WOR,LOR,WTO,LTO,WFTA,LFTA,Score:TeamName) %>%
+  group_by(TeamName) %>%
+  mutate(FGA = (WFGA*Winner)+(LFGA*Loser),
+         OR = (WOR*Winner)+(LOR*Loser),
+         TO = (WTO*Winner)+(LTO*Loser), 
+         FTA = (WFTA*Winner)+(LFTA*Loser),
+         Poss = ((FGA-OR)+TO+(0.44*FTA)), 
+         Off = (Poss/Score)*100 ) %>%
+  summarise(Off = mean(Off),
+            Games = sum(Winner + Loser),
+            Wins = sum(Winner)) %>%
+  ggplot() +
+  geom_point(mapping = aes(x = Wins, y = Off)) +
+  gghighlight(TeamName == "Connecticut" |
+                TeamName == "North Carolina" |
+                TeamName ==  "Kentucky"|
+                TeamName =="Duke"|
+                TeamName =="Villanova"|
+                TeamName =="Louisville"|
+                TeamName =="Kansas"|
+                TeamName =="Michigan St"|
+                TeamName =="Florida"|
+                TeamName =="Michigan",label_key = TeamName) +
+  labs(x = "Wins", y = "Percent", title = "Average Offensive Efficiency Per Game 2017") +
+  theme(text = element_text(size = 7))
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,fig.width= 12,fig.height=8,fig.align = 'center'}
+#Offense efficiency average per game month before tournament
+plot47 <- BeforeTourney %>%
+  filter(Season == 2019) %>%
+  select(Season,WFGA,LFGA,WOR,LOR,WTO,LTO,WFTA,LFTA,Score:TeamName) %>%
+  group_by(TeamName) %>%
+  mutate(FGA = (WFGA*Winner)+(LFGA*Loser),
+         OR = (WOR*Winner)+(LOR*Loser),
+         TO = (WTO*Winner)+(LTO*Loser), 
+         FTA = (WFTA*Winner)+(LFTA*Loser),
+         Poss = ((FGA-OR)+TO+(0.44*FTA)), 
+         Off = (Poss/Score)*100 ) %>%
+  summarise(Off = mean(Off),
+            Games = sum(Winner + Loser),
+            Wins = sum(Winner)) %>%
+  ggplot() +
+  geom_point(mapping = aes(x = Wins, y = Off)) +
+  gghighlight(TeamName == "Connecticut" |
+                TeamName == "North Carolina" |
+                TeamName ==  "Kentucky"|
+                TeamName =="Duke"|
+                TeamName =="Villanova"|
+                TeamName =="Louisville"|
+                TeamName =="Kansas"|
+                TeamName =="Michigan St"|
+                TeamName =="Florida"|
+                TeamName =="Michigan",label_key = TeamName) +
+  labs(x = "Wins", y = "Percent", title = "Average Offensive Efficiency Per Game 2019") +
+  theme(text = element_text(size = 7))
+grid.arrange(plot44,plot45,plot46,plot47,ncol = 2)
+```
+
+The next advanced statistic that will be analyzed is the Offensive Rating of a team the second half of the season. The formula for Offensive Rating is:
+
+$$Offensive\:Rating = \frac{Score}{Possessions}*100\%$$
+
+Before even looking at the graphs, it is pretty easy to know what the results will be. The formula for Offensive Rating is identical to Offensive Efficiency other than being its inverse. Meaning that Score is now in the numerator and Possesssions is now in the denominators. This sudtle change will result in all the plots seen for Offensive Efficiency being flipped. Now the team with the highest Offensive Rating will also have the most wins, as seen below. Since these statistics communicate nearly the same thing, only one of them will be needed as a feature. 
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,fig.width= 12,fig.height=8,fig.align = 'center'}
+#Offensive rating average per game month before tournament
+plot48 <- BeforeTourney %>%
+  filter(Season == 2009) %>%
+  select(Season,WFGA,LFGA,WOR,LOR,WTO,LTO,WFTA,LFTA,Score:TeamName) %>%
+  group_by(TeamName) %>%
+  mutate(FGA = (WFGA*Winner)+(LFGA*Loser),
+         OR = (WOR*Winner)+(LOR*Loser),
+         TO = (WTO*Winner)+(LTO*Loser), 
+         FTA = (WFTA*Winner)+(LFTA*Loser),
+         Poss = ((FGA-OR)+TO+(0.44*FTA)), 
+         Off = (Score/Poss)*100 ) %>%
+  summarise(Off = mean(Off),
+            Games = sum(Winner + Loser),
+            Wins = sum(Winner)) %>%
+  ggplot() +
+  geom_point(mapping = aes(x = Wins, y = Off)) +
+  gghighlight(TeamName == "Connecticut" |
+                TeamName == "North Carolina" |
+                TeamName ==  "Kentucky"|
+                TeamName =="Duke"|
+                TeamName =="Villanova"|
+                TeamName =="Louisville"|
+                TeamName =="Kansas"|
+                TeamName =="Michigan St"|
+                TeamName =="Florida"|
+                TeamName =="Michigan",label_key = TeamName) +
+  labs(x = "Wins", y = "Percent", title = "Average Offensive Rating Per Game 2009") +
+  theme(text = element_text(size = 7))
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,fig.width= 12,fig.height=8,fig.align = 'center'}
+#Offensive rating average per game month before tournament
+plot49 <- BeforeTourney %>%
+  filter(Season == 2013) %>%
+  select(Season,WFGA,LFGA,WOR,LOR,WTO,LTO,WFTA,LFTA,Score:TeamName) %>%
+  group_by(TeamName) %>%
+  mutate(FGA = (WFGA*Winner)+(LFGA*Loser),
+         OR = (WOR*Winner)+(LOR*Loser),
+         TO = (WTO*Winner)+(LTO*Loser), 
+         FTA = (WFTA*Winner)+(LFTA*Loser),
+         Poss = ((FGA-OR)+TO+(0.44*FTA)), 
+         Off = (Score/Poss)*100 ) %>%
+  summarise(Off = mean(Off),
+            Games = sum(Winner + Loser),
+            Wins = sum(Winner)) %>%
+  ggplot() +
+  geom_point(mapping = aes(x = Wins, y = Off)) +
+  gghighlight(TeamName == "Connecticut" |
+                TeamName == "North Carolina" |
+                TeamName ==  "Kentucky"|
+                TeamName =="Duke"|
+                TeamName =="Villanova"|
+                TeamName =="Louisville"|
+                TeamName =="Kansas"|
+                TeamName =="Michigan St"|
+                TeamName =="Florida"|
+                TeamName =="Michigan",label_key = TeamName) +
+  labs(x = "Wins", y = "Percent", title = "Average Offensive Rating Per Game 2013") +
+  theme(text = element_text(size = 7))
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,fig.width= 12,fig.height=8,fig.align = 'center'}
+#Offensive rating average per game month before tournament
+plot50 <- BeforeTourney %>%
+  filter(Season == 2017) %>%
+  select(Season,WFGA,LFGA,WOR,LOR,WTO,LTO,WFTA,LFTA,Score:TeamName) %>%
+  group_by(TeamName) %>%
+  mutate(FGA = (WFGA*Winner)+(LFGA*Loser),
+         OR = (WOR*Winner)+(LOR*Loser),
+         TO = (WTO*Winner)+(LTO*Loser), 
+         FTA = (WFTA*Winner)+(LFTA*Loser),
+         Poss = ((FGA-OR)+TO+(0.44*FTA)), 
+         Off = (Score/Poss)*100 ) %>%
+  summarise(Off = mean(Off),
+            Games = sum(Winner + Loser),
+            Wins = sum(Winner)) %>%
+  ggplot() +
+  geom_point(mapping = aes(x = Wins, y = Off)) +
+  gghighlight(TeamName == "Connecticut" |
+                TeamName == "North Carolina" |
+                TeamName ==  "Kentucky"|
+                TeamName =="Duke"|
+                TeamName =="Villanova"|
+                TeamName =="Louisville"|
+                TeamName =="Kansas"|
+                TeamName =="Michigan St"|
+                TeamName =="Florida"|
+                TeamName =="Michigan",label_key = TeamName) +
+  labs(x = "Wins", y = "Percent", title = "Average Offensive Rating Per Game 2017") +
+  theme(text = element_text(size = 7))
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,fig.width= 12,fig.height=8,fig.align = 'center'}
+#Offensive rating average per game month before tournament
+plot51 <- BeforeTourney %>%
+  filter(Season == 2019) %>%
+  select(Season,WFGA,LFGA,WOR,LOR,WTO,LTO,WFTA,LFTA,Score:TeamName) %>%
+  group_by(TeamName) %>%
+  mutate(FGA = (WFGA*Winner)+(LFGA*Loser),
+         OR = (WOR*Winner)+(LOR*Loser),
+         TO = (WTO*Winner)+(LTO*Loser), 
+         FTA = (WFTA*Winner)+(LFTA*Loser),
+         Poss = ((FGA-OR)+TO+(0.44*FTA)), 
+         Off = (Score/Poss)*100 ) %>%
+  summarise(Off = mean(Off),
+            Games = sum(Winner + Loser),
+            Wins = sum(Winner)) %>%
+  ggplot() +
+  geom_point(mapping = aes(x = Wins, y = Off)) +
+  gghighlight(TeamName == "Connecticut" |
+                TeamName == "North Carolina" |
+                TeamName ==  "Kentucky"|
+                TeamName =="Duke"|
+                TeamName =="Villanova"|
+                TeamName =="Louisville"|
+                TeamName =="Kansas"|
+                TeamName =="Michigan St"|
+                TeamName =="Florida"|
+                TeamName =="Michigan",label_key = TeamName) +
+  labs(x = "Wins", y = "Percent", title = "Average Offensive Rating Per Game 2019") +
+  theme(text = element_text(size = 7))
+grid.arrange(plot48,plot49,plot50,plot51, ncol=2)
+```
+
+Now, Defensive Efficiency will be observed. Again, this is an advanced statistic and will need to be calculated by a formula. The formula for Defensive Efficiency can be calculated by the equation: 
+
+
+$$Defensive\:Efficiency = \frac{Possessions}{Opponent's Score}*100\%$$
+
+Observing the plots below, it can be assumed that there is a positive correlation between Defensive Efficiency and wins. Seeing where the selected teams fall is also valuable because it shows that this is a key metric in determining which teams will be more likely to win in the tournament. 
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,fig.width= 12,fig.height=8,fig.align = 'center'}
+#Defense efficiency average per game month before tournament
+plot52 <- BeforeTourney %>%
+  filter(Season == 2009) %>%
+  group_by(TeamName) %>%
+  mutate(FGA = (WFGA*Winner)+(LFGA*Loser),
+         OR = (WOR*Winner)+(LOR*Loser),
+         TO = (WTO*Winner)+(LTO*Loser), 
+         FTA = (WFTA*Winner)+(LFTA*Loser),
+         Poss = ((FGA-OR)+TO+(0.44*FTA)), 
+         Opp_Score = ((((WFGM-WFGM3)*2)+(3*WFGM3)+WFTM)*Opp_Win) +
+           ((((LFGM-LFGM3)*2)+(3*LFGM3)+LFTM)*Opp_Lose),
+         Def = (Poss/Opp_Score)*100 ) %>%
+  summarise(Def = mean(Def),
+            Games = sum(Winner + Loser),
+            Wins = sum(Winner)) %>%
+  ggplot() +
+  geom_point(mapping = aes(x = Wins, y = Def)) +
+  gghighlight(TeamName == "Connecticut" |
+                TeamName == "North Carolina" |
+                TeamName ==  "Kentucky"|
+                TeamName =="Duke"|
+                TeamName =="Villanova"|
+                TeamName =="Louisville"|
+                TeamName =="Kansas"|
+                TeamName =="Michigan St"|
+                TeamName =="Florida"|
+                TeamName =="Michigan",label_key = TeamName) +
+  labs(x = "Wins", y = "Percent", title = "Average Defense Efficiency Per Game 2009") +
+  theme(text = element_text(size = 7))
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,fig.width= 12,fig.height=8,fig.align = 'center'}
+#Defense efficiency average per game month before tournament
+plot53 <- BeforeTourney %>%
+  filter(Season == 2013) %>%
+  group_by(TeamName) %>%
+  mutate(FGA = (WFGA*Winner)+(LFGA*Loser),
+         OR = (WOR*Winner)+(LOR*Loser),
+         TO = (WTO*Winner)+(LTO*Loser), 
+         FTA = (WFTA*Winner)+(LFTA*Loser),
+         Poss = ((FGA-OR)+TO+(0.44*FTA)), 
+         Opp_Score = ((((WFGM-WFGM3)*2)+(3*WFGM3)+WFTM)*Opp_Win) +
+           ((((LFGM-LFGM3)*2)+(3*LFGM3)+LFTM)*Opp_Lose),
+         Def = (Poss/Opp_Score)*100 ) %>%
+  summarise(Def = mean(Def),
+            Games = sum(Winner + Loser),
+            Wins = sum(Winner)) %>%
+  ggplot() +
+  geom_point(mapping = aes(x = Wins, y = Def)) +
+  gghighlight(TeamName == "Connecticut" |
+                TeamName == "North Carolina" |
+                TeamName ==  "Kentucky"|
+                TeamName =="Duke"|
+                TeamName =="Villanova"|
+                TeamName =="Louisville"|
+                TeamName =="Kansas"|
+                TeamName =="Michigan St"|
+                TeamName =="Florida"|
+                TeamName =="Michigan",label_key = TeamName) +
+  labs(x = "Wins", y = "Percent", title = "Average Defense Efficiency Per Game 2013") +
+  theme(text = element_text(size = 7))
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,fig.width= 12,fig.height=8,fig.align = 'center'}
+#Defense efficiency average per game month before tournament
+plot54 <- BeforeTourney %>%
+  filter(Season == 2017) %>%
+  group_by(TeamName) %>%
+  mutate(FGA = (WFGA*Winner)+(LFGA*Loser),
+         OR = (WOR*Winner)+(LOR*Loser),
+         TO = (WTO*Winner)+(LTO*Loser), 
+         FTA = (WFTA*Winner)+(LFTA*Loser),
+         Poss = ((FGA-OR)+TO+(0.44*FTA)), 
+         Opp_Score = ((((WFGM-WFGM3)*2)+(3*WFGM3)+WFTM)*Opp_Win) +
+           ((((LFGM-LFGM3)*2)+(3*LFGM3)+LFTM)*Opp_Lose),
+         Def = (Poss/Opp_Score)*100 ) %>%
+  summarise(Def = mean(Def),
+            Games = sum(Winner + Loser),
+            Wins = sum(Winner)) %>%
+  ggplot() +
+  geom_point(mapping = aes(x = Wins, y = Def)) +
+  gghighlight(TeamName == "Connecticut" |
+                TeamName == "North Carolina" |
+                TeamName ==  "Kentucky"|
+                TeamName =="Duke"|
+                TeamName =="Villanova"|
+                TeamName =="Louisville"|
+                TeamName =="Kansas"|
+                TeamName =="Michigan St"|
+                TeamName =="Florida"|
+                TeamName =="Michigan",label_key = TeamName) +
+  labs(x = "Wins", y = "Percent", title = "Average Defense Efficiency Per Game 2017") +
+  theme(text = element_text(size = 7))
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,fig.width= 12,fig.height=8,fig.align = 'center'}
+#Defense efficiency average per game month before tournament
+plot55 <- BeforeTourney %>%
+  filter(Season == 2019) %>%
+  group_by(TeamName) %>%
+  mutate(FGA = (WFGA*Winner)+(LFGA*Loser),
+         OR = (WOR*Winner)+(LOR*Loser),
+         TO = (WTO*Winner)+(LTO*Loser), 
+         FTA = (WFTA*Winner)+(LFTA*Loser),
+         Poss = ((FGA-OR)+TO+(0.44*FTA)), 
+         Opp_Score = ((((WFGM-WFGM3)*2)+(3*WFGM3)+WFTM)*Opp_Win) +
+           ((((LFGM-LFGM3)*2)+(3*LFGM3)+LFTM)*Opp_Lose),
+         Def = (Poss/Opp_Score)*100 ) %>%
+  summarise(Def = mean(Def),
+            Games = sum(Winner + Loser),
+            Wins = sum(Winner)) %>%
+  ggplot() +
+  geom_point(mapping = aes(x = Wins, y = Def)) +
+  gghighlight(TeamName == "Connecticut" |
+                TeamName == "North Carolina" |
+                TeamName ==  "Kentucky"|
+                TeamName =="Duke"|
+                TeamName =="Villanova"|
+                TeamName =="Louisville"|
+                TeamName =="Kansas"|
+                TeamName =="Michigan St"|
+                TeamName =="Florida"|
+                TeamName =="Michigan",label_key = TeamName) +
+  labs(x = "Wins", y = "Percent", title = "Average Defense Efficiency Per Game 2019") +
+  theme(text = element_text(size = 7))
+grid.arrange(plot52,plot53,plot54,plot55, ncol = 2)
+```
+
+Lastly, the Defensive Ratings average will be visualized. The relationship between Offensive Efficiency and Defensive Ratings showed to be inverses of each other and the same can be said between Defensive Efficiency and Defensive Ratings. This is confirmed by plotting the results, as shown below. Since Defensive Efficiency and Defensive Ratings are inverses, only one of them should be considered in a predictive model. 
+```{r echo=FALSE, warning=FALSE, message=FALSE,fig.width= 12,fig.height=8,fig.align = 'center'}
+#Defensive Ratings average per game month before tournament
+plot56 <- BeforeTourney %>%
+  filter(Season == 2009) %>%
+  group_by(TeamName) %>%
+  mutate(FGA = (WFGA*Winner)+(LFGA*Loser),
+         OR = (WOR*Winner)+(LOR*Loser),
+         TO = (WTO*Winner)+(LTO*Loser), 
+         FTA = (WFTA*Winner)+(LFTA*Loser),
+         Poss = ((FGA-OR)+TO+(0.44*FTA)), 
+         Opp_Score = ((((WFGM-WFGM3)*2)+(3*WFGM3)+WFTM)*Opp_Win) +
+           ((((LFGM-LFGM3)*2)+(3*LFGM3)+LFTM)*Opp_Lose),
+         Def = (Opp_Score/Poss)*100 ) %>%
+  summarise(Def = mean(Def),
+            Games = sum(Winner + Loser),
+            Wins = sum(Winner)) %>%
+  ggplot() +
+  geom_point(mapping = aes(x = Wins, y = Def)) +
+  gghighlight(TeamName == "Connecticut" |
+                TeamName == "North Carolina" |
+                TeamName ==  "Kentucky"|
+                TeamName =="Duke"|
+                TeamName =="Villanova"|
+                TeamName =="Louisville"|
+                TeamName =="Kansas"|
+                TeamName =="Michigan St"|
+                TeamName =="Florida"|
+                TeamName =="Michigan",label_key = TeamName) +
+  labs(x = "Wins", y = "Percent", title = "Average Defensive Rating Per Game 2009") +
+  theme(text = element_text(size = 7))
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,fig.width= 12,fig.height=8,fig.align = 'center'}
+#Defensive Ratings average per game month before tournament
+plot57 <- BeforeTourney %>%
+  filter(Season == 2013) %>%
+  group_by(TeamName) %>%
+  mutate(FGA = (WFGA*Winner)+(LFGA*Loser),
+         OR = (WOR*Winner)+(LOR*Loser),
+         TO = (WTO*Winner)+(LTO*Loser), 
+         FTA = (WFTA*Winner)+(LFTA*Loser),
+         Poss = ((FGA-OR)+TO+(0.44*FTA)), 
+         Opp_Score = ((((WFGM-WFGM3)*2)+(3*WFGM3)+WFTM)*Opp_Win) +
+           ((((LFGM-LFGM3)*2)+(3*LFGM3)+LFTM)*Opp_Lose),
+         Def = (Opp_Score/Poss)*100 ) %>%
+  summarise(Def = mean(Def),
+            Games = sum(Winner + Loser),
+            Wins = sum(Winner)) %>%
+  ggplot() +
+  geom_point(mapping = aes(x = Wins, y = Def)) +
+  gghighlight(TeamName == "Connecticut" |
+                TeamName == "North Carolina" |
+                TeamName ==  "Kentucky"|
+                TeamName =="Duke"|
+                TeamName =="Villanova"|
+                TeamName =="Louisville"|
+                TeamName =="Kansas"|
+                TeamName =="Michigan St"|
+                TeamName =="Florida"|
+                TeamName =="Michigan",label_key = TeamName) +
+  labs(x = "Wins", y = "Percent", title = "Average Defensive Rating Per Game 2013") +
+  theme(text = element_text(size = 7))
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,fig.width= 12,fig.height=8,fig.align = 'center'}
+#Defensive Ratings average per game month before tournament
+plot58 <- BeforeTourney %>%
+  filter(Season == 2017) %>%
+  group_by(TeamName) %>%
+  mutate(FGA = (WFGA*Winner)+(LFGA*Loser),
+         OR = (WOR*Winner)+(LOR*Loser),
+         TO = (WTO*Winner)+(LTO*Loser), 
+         FTA = (WFTA*Winner)+(LFTA*Loser),
+         Poss = ((FGA-OR)+TO+(0.44*FTA)), 
+         Opp_Score = ((((WFGM-WFGM3)*2)+(3*WFGM3)+WFTM)*Opp_Win) +
+           ((((LFGM-LFGM3)*2)+(3*LFGM3)+LFTM)*Opp_Lose),
+         Def = (Opp_Score/Poss)*100 ) %>%
+  summarise(Def = mean(Def),
+            Games = sum(Winner + Loser),
+            Wins = sum(Winner)) %>%
+  ggplot() +
+  geom_point(mapping = aes(x = Wins, y = Def)) +
+  gghighlight(TeamName == "Connecticut" |
+                TeamName == "North Carolina" |
+                TeamName ==  "Kentucky"|
+                TeamName =="Duke"|
+                TeamName =="Villanova"|
+                TeamName =="Louisville"|
+                TeamName =="Kansas"|
+                TeamName =="Michigan St"|
+                TeamName =="Florida"|
+                TeamName =="Michigan",label_key = TeamName) +
+  labs(x = "Wins", y = "Percent", title = "Average Defensive Rating Per Game 2017") +
+  theme(text = element_text(size = 7))
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,fig.width= 12,fig.height=8,fig.align = 'center'}
+#Defensive Ratings average per game month before tournament
+plot59 <- BeforeTourney %>%
+  filter(Season == 2019) %>%
+  group_by(TeamName) %>%
+  mutate(FGA = (WFGA*Winner)+(LFGA*Loser),
+         OR = (WOR*Winner)+(LOR*Loser),
+         TO = (WTO*Winner)+(LTO*Loser), 
+         FTA = (WFTA*Winner)+(LFTA*Loser),
+         Poss = ((FGA-OR)+TO+(0.44*FTA)), 
+         Opp_Score = ((((WFGM-WFGM3)*2)+(3*WFGM3)+WFTM)*Opp_Win) +
+           ((((LFGM-LFGM3)*2)+(3*LFGM3)+LFTM)*Opp_Lose),
+         Def = (Opp_Score/Poss)*100 ) %>%
+  summarise(Def = mean(Def),
+            Games = sum(Winner + Loser),
+            Wins = sum(Winner)) %>%
+  ggplot() +
+  geom_point(mapping = aes(x = Wins, y = Def)) +
+  gghighlight(TeamName == "Connecticut" |
+                TeamName == "North Carolina" |
+                TeamName ==  "Kentucky"|
+                TeamName =="Duke"|
+                TeamName =="Villanova"|
+                TeamName =="Louisville"|
+                TeamName =="Kansas"|
+                TeamName =="Michigan St"|
+                TeamName =="Florida"|
+                TeamName =="Michigan",label_key = TeamName) +
+  labs(x = "Wins", y = "Percent", title = "Average Defensive Rating Per Game 2019") +
+  theme(text = element_text(size = 7))
+grid.arrange(plot56,plot57,plot58,plot59,ncol = 2)
+```
+
+
+|        The following plots will now average all of the statistics together from 2009 to 2019, instead of showing different years. It can be seen that all of the trends saw earlier continue but now the selected teams are clustered towards higher wins. Secondly, field goals attempted still has no correlation and thus, should not be utilized in a predictive model. Remember, these are statistics and wins recorded the second half of the season before the tournament begins. These plots show that teams that have certain statistics do statistically better in the tournament. 
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,fig.width= 12,fig.height=20,fig.align = 'center'}
+#Average score month before tournament
+plot60 <- BeforeTourney %>%
+  filter(Season >= 2009) %>%
+  select(Season,Score:TeamName) %>%
+  group_by(TeamName) %>%
+  summarise(Score = round(mean(Score),1), 
+            Games = sum(Winner + Loser),
+            Wins = sum(Winner)) %>%
+  ggplot() +
+  geom_point(mapping = aes(x = Wins, y = Score)) +
+  gghighlight(TeamName == "Connecticut" |
+                TeamName == "North Carolina" |
+                TeamName ==  "Kentucky"|
+                TeamName == "Duke"|
+                TeamName =="Villanova"|
+                TeamName =="Louisville"|
+                TeamName =="Kansas"|
+                TeamName =="Michigan St"|
+                TeamName =="Florida"|
+                TeamName =="Michigan",label_key = TeamName) +
+  labs(x = "Wins", y = "Score", title = "Average Score Per Game 2009 Through 2019")+
+  theme(text = element_text(size = 7))
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,fig.width= 12,fig.height=20,fig.align = 'center'}
+#Three pointers made per game month before tournament
+plot61 <- BeforeTourney %>%
+  filter(Season >= 2009) %>%
+  select(Season,WFGM3,WFGA3,LFGM3,LFGA3,Winner:TeamName) %>%
+  group_by(TeamName) %>%
+  mutate(FGM3 = (WFGM3*Winner)+(LFGM3*Loser),
+         FGA3 = (WFGA3*Winner)+(LFGA3*Loser), 
+         avg3pt = (FGM3/FGA3)*100) %>%
+  summarise(avg = round(mean(avg3pt),1), 
+            Games = sum(Winner + Loser),
+            Wins = sum(Winner)) %>%
+  ggplot() +
+  geom_point(mapping = aes(x = Wins, y = avg)) +
+  gghighlight(TeamName == "Connecticut" |
+                TeamName == "North Carolina" |
+                TeamName ==  "Kentucky"|
+                TeamName =="Duke"|
+                TeamName =="Villanova"|
+                TeamName =="Louisville"|
+                TeamName =="Kansas"|
+                TeamName =="Michigan St"|
+                TeamName =="Florida"|
+                TeamName =="Michigan",label_key = TeamName) +
+  labs(x = "Wins", y = "Percent", title = "Three Point Average Per Game 2009 Through 2019")+
+  theme(text = element_text(size = 7))
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,fig.width= 12,fig.height=20,fig.align = 'center'}
+#EFG% average per game month before tournament
+plot62 <- BeforeTourney %>%
+  filter(Season >= 2009) %>%
+  select(Season,WFGM,LFGM,WFGM3,LFGM3,WFGA,LFGA,Winner:TeamName) %>%
+  group_by(TeamName) %>%
+  mutate(FGM2 = ((WFGM*Winner)-(WFGM3*Winner)+(LFGM*Loser)-(LFGM3*Loser)),
+         FGM3 = (WFGM3*Winner)+(LFGM3*Loser),
+         FGA = (WFGA*Winner)+(LFGA*Loser),
+         EFG = ((FGM2+(1.5*FGM3))/FGA)*100) %>%
+  summarise(EFG = round(mean(EFG),3),
+            Games = sum(Winner + Loser),
+            Wins = sum(Winner)) %>%
+  ggplot() +
+  geom_point(mapping = aes(x = Wins, y = EFG)) +
+  gghighlight(TeamName == "Connecticut" |
+                TeamName == "North Carolina" |
+                TeamName ==  "Kentucky"|
+                TeamName =="Duke"|
+                TeamName =="Villanova"|
+                TeamName =="Louisville"|
+                TeamName =="Kansas"|
+                TeamName =="Michigan St"|
+                TeamName =="Florida"|
+                TeamName =="Michigan",label_key = TeamName) +
+  labs(x = "Wins", y = "Percent", title = "Average EFG Percent Per Game 2009 Through 2019")+
+  theme(text = element_text(size = 7))
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,fig.width= 12,fig.height=20,fig.align = 'center'}
+#Field goals attempted per game month before tournament
+plot63 <- BeforeTourney %>%
+  filter(Season >= 2009) %>%
+  select(Season,WFGA,LFGA,Winner:TeamName) %>%
+  group_by(TeamName) %>%
+  mutate(FGA = (WFGA*Winner)+(LFGA*Loser)) %>%
+  summarise(FGA = round(mean(FGA),3),
+            Games = sum(Winner + Loser),
+            Wins = sum(Winner)) %>%
+  ggplot() +
+  geom_point(mapping = aes(x = Wins, y = FGA)) +
+  gghighlight(TeamName == "Connecticut" |
+                TeamName == "North Carolina" |
+                TeamName ==  "Kentucky"|
+                TeamName =="Duke"|
+                TeamName =="Villanova"|
+                TeamName =="Louisville"|
+                TeamName =="Kansas"|
+                TeamName =="Michigan St"|
+                TeamName =="Florida"|
+                TeamName =="Michigan",label_key = TeamName) +
+  labs(x = "Wins", y = "FGA", title = "Average Field Goals Attempted Per Game 2009 Through 2019")+
+  theme(text = element_text(size = 7))
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,fig.width= 12,fig.height=20,fig.align = 'center'}
+#Offense efficiency average per game month before tournament
+plot64 <- BeforeTourney %>%
+  filter(Season >= 2009) %>%
+  select(Season,WFGA,LFGA,WOR,LOR,WTO,LTO,WFTA,LFTA,Score:TeamName) %>%
+  group_by(TeamName) %>%
+  mutate(FGA = (WFGA*Winner)+(LFGA*Loser),
+         OR = (WOR*Winner)+(LOR*Loser),
+         TO = (WTO*Winner)+(LTO*Loser), 
+         FTA = (WFTA*Winner)+(LFTA*Loser),
+         Poss = ((FGA-OR)+TO+(0.44*FTA)), 
+         Off = (Poss/Score)*100 ) %>%
+  summarise(Off = mean(Off),
+            Games = sum(Winner + Loser),
+            Wins = sum(Winner)) %>%
+  ggplot() +
+  geom_point(mapping = aes(x = Wins, y = Off)) +
+  gghighlight(TeamName == "Connecticut" |
+                TeamName == "North Carolina" |
+                TeamName ==  "Kentucky"|
+                TeamName =="Duke"|
+                TeamName =="Villanova"|
+                TeamName =="Louisville"|
+                TeamName =="Kansas"|
+                TeamName =="Michigan St"|
+                TeamName =="Florida"|
+                TeamName =="Michigan",label_key = TeamName) +
+  labs(x = "Wins", y = "Percent", title = "Average Offensive Efficiency Per Game 2009 Through 2019")+
+  theme(text = element_text(size = 7))
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,fig.width= 12,fig.height=20,fig.align = 'center'}
+#Offensive rating average per game month before tournament
+plot65 <- BeforeTourney %>%
+  filter(Season >= 2009) %>%
+  select(Season,WFGA,LFGA,WOR,LOR,WTO,LTO,WFTA,LFTA,Score:TeamName) %>%
+  group_by(TeamName) %>%
+  mutate(FGA = (WFGA*Winner)+(LFGA*Loser),
+         OR = (WOR*Winner)+(LOR*Loser),
+         TO = (WTO*Winner)+(LTO*Loser), 
+         FTA = (WFTA*Winner)+(LFTA*Loser),
+         Poss = ((FGA-OR)+TO+(0.44*FTA)), 
+         Off = (Score/Poss)*100 ) %>%
+  summarise(Off = mean(Off),
+            Games = sum(Winner + Loser),
+            Wins = sum(Winner)) %>%
+  ggplot() +
+  geom_point(mapping = aes(x = Wins, y = Off)) +
+  gghighlight(TeamName == "Connecticut" |
+                TeamName == "North Carolina" |
+                TeamName ==  "Kentucky"|
+                TeamName =="Duke"|
+                TeamName =="Villanova"|
+                TeamName =="Louisville"|
+                TeamName =="Kansas"|
+                TeamName =="Michigan St"|
+                TeamName =="Florida"|
+                TeamName =="Michigan",label_key = TeamName) +
+  labs(x = "Wins", y = "Percent", title = "Average Offensive Rating Per Game 2009 Through 2019")+
+  theme(text = element_text(size = 7))
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,fig.width= 12,fig.height=20,fig.align = 'center'}
+#Defense efficiency average per game month before tournament
+plot66 <- BeforeTourney %>%
+  filter(Season >= 2009) %>%
+  group_by(TeamName) %>%
+  mutate(FGA = (WFGA*Winner)+(LFGA*Loser),
+         OR = (WOR*Winner)+(LOR*Loser),
+         TO = (WTO*Winner)+(LTO*Loser), 
+         FTA = (WFTA*Winner)+(LFTA*Loser),
+         Poss = ((FGA-OR)+TO+(0.44*FTA)), 
+         Opp_Score = ((((WFGM-WFGM3)*2)+(3*WFGM3)+WFTM)*Opp_Win) +
+           ((((LFGM-LFGM3)*2)+(3*LFGM3)+LFTM)*Opp_Lose),
+         Def = (Poss/Opp_Score)*100 ) %>%
+  summarise(Def = mean(Def),
+            Games = sum(Winner + Loser),
+            Wins = sum(Winner)) %>%
+  ggplot() +
+  geom_point(mapping = aes(x = Wins, y = Def)) +
+  gghighlight(TeamName == "Connecticut" |
+                TeamName == "North Carolina" |
+                TeamName ==  "Kentucky"|
+                TeamName =="Duke"|
+                TeamName =="Villanova"|
+                TeamName =="Louisville"|
+                TeamName =="Kansas"|
+                TeamName =="Michigan St"|
+                TeamName =="Florida"|
+                TeamName =="Michigan",label_key = TeamName) +
+  labs(x = "Wins", y = "Percent", title = "Average Defense Efficiency Per Game 2009 Through 2019") +
+  theme(text = element_text(size = 7))
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,fig.width= 12,fig.height=20,fig.align = 'center'}
+#Defensive Ratings average per game month before tournament
+plot67 <- BeforeTourney %>%
+  filter(Season >= 2009) %>%
+  group_by(TeamName) %>%
+  mutate(FGA = (WFGA*Winner)+(LFGA*Loser),
+         OR = (WOR*Winner)+(LOR*Loser),
+         TO = (WTO*Winner)+(LTO*Loser), 
+         FTA = (WFTA*Winner)+(LFTA*Loser),
+         Poss = ((FGA-OR)+TO+(0.44*FTA)), 
+         Opp_Score = ((((WFGM-WFGM3)*2)+(3*WFGM3)+WFTM)*Opp_Win) +
+           ((((LFGM-LFGM3)*2)+(3*LFGM3)+LFTM)*Opp_Lose),
+         Def = (Opp_Score/Poss)*100 ) %>%
+  summarise(Def = mean(Def),
+            Games = sum(Winner + Loser),
+            Wins = sum(Winner)) %>%
+  ggplot() +
+  geom_point(mapping = aes(x = Wins, y = Def)) +
+  gghighlight(TeamName == "Connecticut" |
+                TeamName == "North Carolina" |
+                TeamName ==  "Kentucky"|
+                TeamName =="Duke"|
+                TeamName =="Villanova"|
+                TeamName =="Louisville"|
+                TeamName =="Kansas"|
+                TeamName =="Michigan St"|
+                TeamName =="Florida"|
+                TeamName =="Michigan",label_key = TeamName) +
+  labs(x = "Wins", y = "Percent", title = "Average Defensive Rating Per Game 2009 Through 2019") +
+  theme(text = element_text(size = 7))
+grid.arrange(plot60,plot61,plot62,plot63,plot64,plot65,plot66,plot67,ncol=2)
+```
+
+
+# Statstics Impact on Tournament
+
+|        Now it is time to see if the statisctics recorded the second half of the season before the tournament starts has any impacts on who wins and losses in each round of the tournament. Each round of last year's March Madness Tournament will be analyzed by key statistics to see which statistics do a better job of predicting who wins and who loses. The first group of plots show the impact each statistic had on which teams won and which teams lost. The bluish/green bars represent the winning teams and the red bars represent the losing teams. Judging by the results, it appears that Offensive Efficiency, Blocks, and Assists were the best statistics to use to predict the winners in the first round. The teams that averaged higher in those statistics were more successful compared to the other statistics.
+
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+
+StatsImpact <- BeforeTourney %>%
+  filter(Season >= 2003) %>%
+  group_by(Season,TeamName) %>%
+  mutate(FGA = (WFGA*Winner)+(LFGA*Loser),
+         FGM2 = ((WFGM*Winner)-(WFGM3*Winner)+(LFGM*Loser)-(LFGM3*Loser)),
+         FGM3 = (WFGM3*Winner)+(LFGM3*Loser),
+         FGA3 = (WFGA3*Winner)+(LFGA3*Loser),
+         avg3pt = (FGM3/FGA3)*100,
+         EFG = ((FGM2+(1.5*FGM3))/FGA)*100,
+         FTA = (WFTA*Winner)+(LFTA*Loser),
+         OR = (WOR*Winner)+(LOR*Loser),
+         TO = (WTO*Winner)+(LTO*Loser),
+         Poss = ((FGA-OR)+TO+(0.44*FTA)), 
+         Off = (Score/Poss)*100,
+         Opp_Score = ((((WFGM-WFGM3)*2)+(3*WFGM3)+WFTM)*Opp_Win) +
+           ((((LFGM-LFGM3)*2)+(3*LFGM3)+LFTM)*Opp_Lose),
+         Def_eff = (Poss/Opp_Score)*100,
+         Def_rating = (Opp_Score/Poss)*100,
+         Blk = (WBlk*Winner)+(LBlk*Loser),
+         DR = (WDR*Winner)+(LDR*Loser),
+         Ast = (WAst*Winner)+(LAst*Loser),
+         Stl = (WStl*Winner)+(LStl*Loser),
+         PF = (WPF*Winner)+(LPF*Loser)) %>%
+  summarise(Score = round(mean(Score),1),
+            FGA = round(mean(FGA),1),
+            FGM2 = round(mean(FGM2),1),
+            FGM3 = round(mean(FGM3),1),
+            avg3pt = round(mean(avg3pt),1),
+            EFG = round(mean(EFG),1),
+            FTA = round(mean(FTA),1),
+            OR = round(mean(OR),1),
+            TO = round(mean(TO),1),
+            Poss = round(mean(Poss),1),
+            Off = round(mean(Off),1),
+            Opp_Score = round(mean(Opp_Score),1),
+            Def_eff = round(mean(Def_eff),1),
+            Def_rating = round(mean(Def_rating),1),
+            Blk = round(mean(Blk),1),
+            DR = round(mean(DR),1),
+            Ast = round(mean(Ast),1),
+            Stl = round(mean(Stl),1),
+            PF = round(mean(PF),1)) 
+
+
+TourneyResults <- TourneyResults %>%
+  filter(Season >= 2003)
+
+StatsImpact <- StatsImpact %>%
+  left_join(TourneyResults, by = c("Season","TeamName")) %>%
+  rename(Score_Season = "Score.x", Score_Tournament = "Score.y")
+```
+
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,fig.width= 12,fig.height=9,fig.align = 'center'}
+
+plot68 <- StatsImpact %>%
+  filter(Season == 2019 & TourneyRound == "First Round" & Win != "NA") %>%
+  ggplot(aes(x = reorder(TeamName,EFG), y = EFG,fill = Win)) +
+  geom_bar(stat = "identity", color = "black") +
+  scale_y_continuous(breaks= pretty_breaks()) +
+  labs(x = "School", y = "EFG Percent", title = "EFG Impact 1st Round") +
+  coord_flip() +
+  theme(text = element_text(size = 5))
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,fig.width= 12,fig.height=9,fig.align = 'center'}
+plot69 <- StatsImpact %>%
+  filter(Season == 2019 & TourneyRound == "First Round" & Win != "NA") %>%
+  ggplot(aes(x = reorder(TeamName,avg3pt), y = avg3pt,fill = Win)) +
+  geom_bar(stat = "identity", color = "black") +
+  scale_y_continuous(breaks= pretty_breaks()) +
+  labs(x = "School", y = "Average 3pt Percent", title = "3pt Percent Impact 1st Round") +
+  coord_flip() +
+  theme(text = element_text(size = 5))
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,fig.width= 12,fig.height=9,fig.align = 'center'}
+plot70 <- StatsImpact %>%
+  filter(Season == 2019 & TourneyRound == "First Round" & Win != "NA") %>%
+  ggplot(aes(x = reorder(TeamName,Off), y = Off,fill = Win)) +
+  geom_bar(stat = "identity", color = "black") +
+  scale_y_continuous(breaks= pretty_breaks()) +
+  labs(x = "School", y = "Offensive Efficiency", title = "Offensive Efficiency 1st Round") +
+  coord_flip() +
+  theme(text = element_text(size = 5))
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,fig.width= 12,fig.height=9,fig.align = 'center'}
+plot71 <- StatsImpact %>%
+  filter(Season == 2019 & TourneyRound == "First Round" & Win != "NA") %>%
+  ggplot(aes(x = reorder(TeamName,Def_eff), y = Def_eff,fill = Win)) +
+  geom_bar(stat = "identity", color = "black") +
+  scale_y_continuous(breaks= pretty_breaks()) +
+  labs(x = "School", y = "Defensive Efficiency", title = "Defensive Efficiency 1st Round") +
+  coord_flip() +
+  theme(text = element_text(size = 5))
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,fig.width= 12,fig.height=9,fig.align = 'center'}
+plot72 <- StatsImpact %>%
+  filter(Season == 2019 & TourneyRound == "First Round" & Win != "NA") %>%
+  ggplot(aes(x = reorder(TeamName,Blk), y = Blk,fill = Win)) +
+  geom_bar(stat = "identity", color = "black") +
+  scale_y_continuous(breaks= pretty_breaks()) +
+  labs(x = "School", y = "Blocks", title = "Blocks Impact 1st Round") +
+  coord_flip() +
+  theme(text = element_text(size = 5))
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,fig.width= 12,fig.height=9,fig.align = 'center'}
+plot73 <- StatsImpact %>%
+  filter(Season == 2019 & TourneyRound == "First Round" & Win != "NA") %>%
+  ggplot(aes(x = reorder(TeamName,Ast), y = Ast,fill = Win)) +
+  geom_bar(stat = "identity", color = "black") +
+  scale_y_continuous(breaks= pretty_breaks()) +
+  labs(x = "School", y = "Ast", title = "Assists Impact 1st Round") +
+  coord_flip() +
+  theme(text = element_text(size = 5))
+grid.arrange(plot68,plot69,plot70,plot71,plot72,plot73,ncol=3)
+```
+
+Looking on to the second round of the tournament, each of the characteristics were more helpful in determining the winners. The games were more predictable because the higher ranked teams in the various statistics won more. Blocks, 3pt Percentage, and Offensive Efficiency seem to be the best at predicting who would win and lose since the bluish/green bars were more stacked towards the top. 
+
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,fig.width= 12,fig.height=9,fig.align = 'center'}
+#EFG Percent Impact 2nd Round
+plot74 <- StatsImpact %>%
+  filter(Season == 2019 & TourneyRound == "Second Round" & Win != "NA") %>%
+  ggplot(aes(x = reorder(TeamName,EFG), y = EFG,fill = Win)) +
+  geom_bar(stat = "identity", color = "black") +
+  scale_y_continuous(breaks= pretty_breaks()) +
+  labs(x = "School", y = "EFG Percent", title = "EFG Percent Impact 2nd Round") +
+  coord_flip() +
+    theme(text = element_text(size = 5))
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,fig.width= 12,fig.height=9,fig.align = 'center'}
+#3pt Percent Impact 2nd Round
+plot75 <- StatsImpact %>%
+  filter(Season == 2019 & TourneyRound == "Second Round" & Win != "NA") %>%
+  ggplot(aes(x = reorder(TeamName,avg3pt), y = avg3pt,fill = Win)) +
+  geom_bar(stat = "identity", color = "black") +
+  scale_y_continuous(breaks= pretty_breaks()) +
+  labs(x = "School", y = "Average 3pt Percent", title = "3pt Percent Impact 2nd Round") +
+  coord_flip() +
+  theme(text = element_text(size = 5)) 
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,fig.width= 12,fig.height=9,fig.align = 'center'}
+#Offensive Efficiency Impact 2nd Round
+plot76 <- StatsImpact %>%
+  filter(Season == 2019 & TourneyRound == "Second Round" & Win != "NA") %>%
+  ggplot(aes(x = reorder(TeamName,Off), y = Off,fill = Win)) +
+  geom_bar(stat = "identity", color = "black") +
+  scale_y_continuous(breaks= pretty_breaks()) +
+  labs(x = "School", y = "Offensive Efficiency", title = "Offensive Efficiency Impact 2nd Round") +
+  coord_flip() +
+  theme(text = element_text(size = 5))
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,fig.width= 12,fig.height=9,fig.align = 'center'}
+#Defensive Efficiency Impact 2nd Round
+plot77 <- StatsImpact %>%
+  filter(Season == 2019 & TourneyRound == "Second Round" & Win != "NA") %>%
+  ggplot(aes(x = reorder(TeamName,Def_eff), y = Def_eff,fill = Win)) +
+  geom_bar(stat = "identity", color = "black") +
+  scale_y_continuous(breaks= pretty_breaks()) +
+  labs(x = "School", y = "Defensive Efficiency", title = "Defensive Efficiency Impact 2nd Round") +
+  coord_flip() +
+  theme(text = element_text(size = 5))
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,fig.width= 12,fig.height=9,fig.align = 'center'}
+#Average Blocks Impact 2nd Round
+plot78 <- StatsImpact %>%
+  filter(Season == 2019 & TourneyRound == "Second Round" & Win != "NA") %>%
+  ggplot(aes(x = reorder(TeamName,Blk), y = Blk,fill = Win)) +
+  geom_bar(stat = "identity", color = "black") +
+  scale_y_continuous(breaks= pretty_breaks()) +
+  labs(x = "School", y = "Blocks", title = "Average Blocks Impact 2nd Round") +
+  coord_flip() +
+  theme(text = element_text(size = 5))
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,fig.width= 12,fig.height=9,fig.align = 'center'}
+#Average Assists Impact 2nd Round
+plot79 <- StatsImpact %>%
+  filter(Season == 2019 & TourneyRound == "Second Round" & Win != "NA") %>%
+  ggplot(aes(x = reorder(TeamName,Ast), y = Ast,fill = Win)) +
+  geom_bar(stat = "identity", color = "black") +
+  scale_y_continuous(breaks= pretty_breaks()) +
+  labs(x = "School", y = "Ast", title = "Average Assists Impact 2nd Round") +
+  coord_flip() +
+  theme(text = element_text(size = 5))
+grid.arrange(plot74,plot75,plot76,plot77,plot78,plot79,ncol=3)
+```
+
+The plots below so the statistical impacts on the Sweet 16 (3rd round). Again, the higher an average a team had for the statistics, the more likely they won their game. It appears that these stats play a much larger role later on in the tournament vs the first round. 
+
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,fig.width= 12,fig.height=9,fig.align = 'center'}
+#EFG Percent Impact Sweet 16
+plot80 <- StatsImpact %>%
+  filter(Season == 2019 & TourneyRound == "Sweet 16" & Win != "NA") %>%
+  ggplot(aes(x = reorder(TeamName,EFG), y = EFG,fill = Win)) +
+  geom_bar(stat = "identity", color = "black") +
+  scale_y_continuous(breaks= pretty_breaks()) +
+  labs(x = "School", y = "EFG Percent", title = "EFG Percent Impact Sweet 16") +
+  coord_flip() +
+  theme(text = element_text(size = 5))
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,fig.width= 12,fig.height=9,fig.align = 'center'}
+#Average 3pt Percent Impact Sweet 16
+plot81 <- StatsImpact %>%
+  filter(Season == 2019 & TourneyRound == "Sweet 16" & Win != "NA") %>%
+  ggplot(aes(x = reorder(TeamName,avg3pt), y = avg3pt,fill = Win)) +
+  geom_bar(stat = "identity", color = "black") +
+  scale_y_continuous(breaks= pretty_breaks()) +
+  labs(x = "School", y = "Average 3pt Percent", title = "Average 3pt Percent Impact Sweet 16") +
+  coord_flip() +
+  theme(text = element_text(size = 5))
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,fig.width= 12,fig.height=9,fig.align = 'center'}
+#Offensive Efficiency Impact Sweet 16
+plot82 <- StatsImpact %>%
+  filter(Season == 2019 & TourneyRound == "Sweet 16" & Win != "NA") %>%
+  ggplot(aes(x = reorder(TeamName,Off), y = Off,fill = Win)) +
+  geom_bar(stat = "identity", color = "black") +
+  scale_y_continuous(breaks= pretty_breaks()) +
+  labs(x = "School", y = "Offensive Efficiency", title = "Offensive Efficiency Impact Sweet 16") +
+  coord_flip() +
+  theme(text = element_text(size = 5))
+
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,fig.width= 12,fig.height=9,fig.align = 'center'}
+#Defensive Efficiency Impact Sweet 16
+plot83 <- StatsImpact %>%
+  filter(Season == 2019 & TourneyRound == "Sweet 16" & Win != "NA") %>%
+  ggplot(aes(x = reorder(TeamName,Def_eff), y = Def_eff,fill = Win)) +
+  geom_bar(stat = "identity", color = "black") +
+  scale_y_continuous(breaks= pretty_breaks()) +
+  labs(x = "School", y = "Defensive Efficiency", title = "Defensive Efficiency Impact Sweet 16") +
+  coord_flip() +
+  theme(text = element_text(size = 5))
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,fig.width= 12,fig.height=9,fig.align = 'center'}
+#Average Blocks Impact Sweet 16
+plot84 <- StatsImpact %>%
+  filter(Season == 2019 & TourneyRound == "Sweet 16" & Win != "NA") %>%
+  ggplot(aes(x = reorder(TeamName,Blk), y = Blk,fill = Win)) +
+  geom_bar(stat = "identity", color = "black") +
+  scale_y_continuous(breaks= pretty_breaks()) +
+  labs(x = "School", y = "Blocks", title = "Average Blocks Impact Sweet 16") +
+  coord_flip() +
+  theme(text = element_text(size = 5))
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,fig.width= 12,fig.height=9,fig.align = 'center'}
+#Average Assists Impact  Sweet 16
+plot85 <- StatsImpact %>%
+  filter(Season == 2019 & TourneyRound == "Sweet 16" & Win != "NA") %>%
+  ggplot(aes(x = reorder(TeamName,Ast), y = Ast,fill = Win)) +
+  geom_bar(stat = "identity", color = "black") +
+  scale_y_continuous(breaks= pretty_breaks()) +
+  labs(x = "School", y = "Ast", title = "Average Assists Impact  Sweet 16") +
+  coord_flip() +
+  theme(text = element_text(size = 5))
+grid.arrange(plot80,plot81,plot82,plot83,plot84,plot85,ncol=3)
+```
+
+The key statistics were less helpful in the Elite 8 (4th round), as seen below. In this round it appears that 3pt percentage played the largest role in determining the winner. Overall, the impacts were scattered in this round. 
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,fig.width= 12,fig.height=9,fig.align = 'center'}
+#EFG Percent Impact Elite 8
+plot86 <- StatsImpact %>%
+  filter(Season == 2019 & TourneyRound == "Elite 8" & Win != "NA") %>%
+  ggplot(aes(x = reorder(TeamName,EFG), y = EFG,fill = Win)) +
+  geom_bar(stat = "identity", color = "black") +
+  scale_y_continuous(breaks= pretty_breaks()) +
+  labs(x = "School", y = "EFG Percent", title = "EFG Percent Impact Elite 8") +
+  coord_flip() +
+  theme(text = element_text(size = 5))
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,fig.width= 12,fig.height=9,fig.align = 'center'}
+#3pt Percent Impact Elite 8
+plot87 <- StatsImpact %>%
+  filter(Season == 2019 & TourneyRound == "Elite 8" & Win != "NA") %>%
+  ggplot(aes(x = reorder(TeamName,avg3pt), y = avg3pt,fill = Win)) +
+  geom_bar(stat = "identity", color = "black") +
+  scale_y_continuous(breaks= pretty_breaks()) +
+  labs(x = "School", y = "Average 3pt Percent", title = "3pt Percent Impact Elite 8") +
+  coord_flip() +
+  theme(text = element_text(size = 5))
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,fig.width= 12,fig.height=9,fig.align = 'center'}
+#Offensive Efficiency Impact Elite 8
+plot88 <- StatsImpact %>%
+  filter(Season == 2019 & TourneyRound == "Elite 8" & Win != "NA") %>%
+  ggplot(aes(x = reorder(TeamName,Off), y = Off,fill = Win)) +
+  geom_bar(stat = "identity", color = "black") +
+  scale_y_continuous(breaks= pretty_breaks()) +
+  labs(x = "School", y = "Offensive Efficiency", title = "Offensive Efficiency Impact Elite 8") +
+  coord_flip() +
+  theme(text = element_text(size = 5))
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,fig.width= 12,fig.height=9,fig.align = 'center'}
+#Defensive Efficiency Impact Elite 8
+plot89 <- StatsImpact %>%
+  filter(Season == 2019 & TourneyRound == "Elite 8" & Win != "NA") %>%
+  ggplot(aes(x = reorder(TeamName,Def_eff), y = Def_eff,fill = Win)) +
+  geom_bar(stat = "identity", color = "black") +
+  scale_y_continuous(breaks= pretty_breaks()) +
+  labs(x = "School", y = "Defensive Efficiency", title = "Defensive Efficiency Impact Elite 8") +
+  coord_flip() +
+  theme(text = element_text(size = 5))
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,fig.width= 12,fig.height=9,fig.align = 'center'}
+#Average Blocks Impact Elite 8
+plot90 <- StatsImpact %>%
+  filter(Season == 2019 & TourneyRound == "Elite 8" & Win != "NA") %>%
+  ggplot(aes(x = reorder(TeamName,Blk), y = Blk,fill = Win)) +
+  geom_bar(stat = "identity", color = "black") +
+  scale_y_continuous(breaks= pretty_breaks()) +
+  labs(x = "School", y = "Blocks", title = "Average Blocks Impact Elite 8") +
+  coord_flip() +
+  theme(text = element_text(size = 5))
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,fig.width= 12,fig.height=9,fig.align = 'center'}
+#Average Assists Impact  Elite 8
+plot91 <- StatsImpact %>%
+  filter(Season == 2019 & TourneyRound == "Elite 8" & Win != "NA") %>%
+  ggplot(aes(x = reorder(TeamName,Ast), y = Ast,fill = Win)) +
+  geom_bar(stat = "identity", color = "black") +
+  scale_y_continuous(breaks= pretty_breaks()) +
+  labs(x = "School", y = "Ast", title = "Average Assists Impact  Elite 8") +
+  coord_flip() +
+  theme(text = element_text(size = 5))
+grid.arrange(plot86,plot87,plot88,plot89,plot90,plot91,ncol=3)
+```
+
+In the Final Four (5th Round), the statistics that correctly predicted the winners were EFG% and Defensive Efficiency. 3pt Percentage also was helpful to an extent. 
+
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,fig.width= 12,fig.height=9,fig.align = 'center'}
+#EFG Percent Impact Final Four
+plot92 <- StatsImpact %>%
+  filter(Season == 2019 & TourneyRound == "Final Four" & Win != "NA") %>%
+  ggplot(aes(x = reorder(TeamName,EFG), y = EFG,fill = Win)) +
+  geom_bar(stat = "identity", color = "black") +
+  scale_y_continuous(breaks= pretty_breaks()) +
+  labs(x = "School", y = "EFG Percent", title = "EFG Percent Impact Final Four") +
+  coord_flip() +
+  theme(text = element_text(size = 5))
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,fig.width= 12,fig.height=9,fig.align = 'center'}
+#Average 3pt Percent Impact Final Four
+plot93 <- StatsImpact %>%
+  filter(Season == 2019 & TourneyRound == "Final Four" & Win != "NA") %>%
+  ggplot(aes(x = reorder(TeamName,avg3pt), y = avg3pt,fill = Win)) +
+  geom_bar(stat = "identity", color = "black") +
+  scale_y_continuous(breaks= pretty_breaks()) +
+  labs(x = "School", y = "Average 3pt Percent", title = "Average 3pt Percent Impact Final Four") +
+  coord_flip() +
+  theme(text = element_text(size = 5))
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,fig.width= 12,fig.height=9,fig.align = 'center'}
+#Offensive Efficiency Impact Final Four
+plot94 <- StatsImpact %>%
+  filter(Season == 2019 & TourneyRound == "Final Four" & Win != "NA") %>%
+  ggplot(aes(x = reorder(TeamName,Off), y = Off,fill = Win)) +
+  geom_bar(stat = "identity", color = "black") +
+  scale_y_continuous(breaks= pretty_breaks()) +
+  labs(x = "School", y = "Offensive Efficiency", title = "Offensive Efficiency Impact Final Four") +
+  coord_flip() +
+  theme(text = element_text(size = 5))
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,fig.width= 12,fig.height=9,fig.align = 'center'}
+#Defensive Efficiency Impact Final Four
+plot95 <- StatsImpact %>%
+  filter(Season == 2019 & TourneyRound == "Final Four" & Win != "NA") %>%
+  ggplot(aes(x = reorder(TeamName,Def_eff), y = Def_eff,fill = Win)) +
+  geom_bar(stat = "identity", color = "black") +
+  scale_y_continuous(breaks= pretty_breaks()) +
+  labs(x = "School", y = "Defensive Efficiency", title = "Defensive Efficiency Impact Final Four") +
+  coord_flip() +
+  theme(text = element_text(size = 5))
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,fig.width= 12,fig.height=9,fig.align = 'center'}
+#Average Blocks Impact Final Four
+plot96 <- StatsImpact %>%
+  filter(Season == 2019 & TourneyRound == "Final Four" & Win != "NA") %>%
+  ggplot(aes(x = reorder(TeamName,Blk), y = Blk,fill = Win)) +
+  geom_bar(stat = "identity", color = "black") +
+  scale_y_continuous(breaks= pretty_breaks()) +
+  labs(x = "School", y = "Blocks", title = "Average Blocks Impact Final Four") +
+  coord_flip() +
+  theme(text = element_text(size = 5))
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,fig.width= 12,fig.height=9,fig.align = 'center'}
+#Average Assists Impact Final Four
+plot97 <- StatsImpact %>%
+  filter(Season == 2019 & TourneyRound == "Final Four" & Win != "NA") %>%
+  ggplot(aes(x = reorder(TeamName,Ast), y = Ast,fill = Win)) +
+  geom_bar(stat = "identity", color = "black") +
+  scale_y_continuous(breaks= pretty_breaks()) +
+  labs(x = "School", y = "Ast", title = "Average Assists Impact Final Four") +
+  coord_flip() +
+  theme(text = element_text(size = 5))
+grid.arrange(plot92,plot93,plot94,plot95,plot96,plot97,ncol=3)
+```
+
+Lastly, all six of the key statistics were able to predict who the national champion would be. Overall, these statistics were helpful in some rounds but not in others. Thus, making predictions on stats alone will not fully optimize making correct predictions. Not to say that the statistics above are not useful because they most certainly could be. But the statistics should not be the sole reasoning behind making certain predictions. 
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,fig.width= 12,fig.height=9,fig.align = 'center'}
+#EFG Percent Impact Championship
+plot98 <- StatsImpact %>%
+  filter(Season == 2019 & TourneyRound == "Championship Game" & Win != "NA") %>%
+  ggplot(aes(x = reorder(TeamName,EFG), y = EFG,fill = Win)) +
+  geom_bar(stat = "identity", color = "black") +
+  scale_y_continuous(breaks= pretty_breaks()) +
+  labs(x = "School", y = "EFG Percent", title = "EFG Percent Impact Championship") +
+  coord_flip() +
+  theme(text = element_text(size = 6))
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,fig.width= 12,fig.height=9,fig.align = 'center'}
+#Average 3pt Percent Impact Championship
+plot99 <- StatsImpact %>%
+  filter(Season == 2019 & TourneyRound == "Championship Game" & Win != "NA") %>%
+  ggplot(aes(x = reorder(TeamName,EFG), y = avg3pt,fill = Win)) +
+  geom_bar(stat = "identity", color = "black") +
+  scale_y_continuous(breaks= pretty_breaks()) +
+  labs(x = "School", y = "Average 3pt Percent", title = "Average 3pt Percent Impact Championship") +
+  coord_flip() +
+  theme(text = element_text(size = 6))
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,fig.width= 12,fig.height=9,fig.align = 'center'}
+#Offensive Efficiency Impact Championship
+plot100 <- StatsImpact %>%
+  filter(Season == 2019 & TourneyRound == "Championship Game" & Win != "NA") %>%
+  ggplot(aes(x = reorder(TeamName,Off), y = Off,fill = Win)) +
+  geom_bar(stat = "identity", color = "black") +
+  scale_y_continuous(breaks= pretty_breaks()) +
+  labs(x = "School", y = "Offensive Efficiency", title = "Offensive Efficiency Impact Championship") +
+  coord_flip() +
+  theme(text = element_text(size = 6))
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,fig.width= 12,fig.height=9,fig.align = 'center'}
+#Defensive Efficiency Impact Championship Game
+plot101 <- StatsImpact %>%
+  filter(Season == 2019 & TourneyRound == "Championship Game" & Win != "NA") %>%
+  ggplot(aes(x = reorder(TeamName,Def_eff), y = Def_eff,fill = Win)) +
+  geom_bar(stat = "identity", color = "black") +
+  scale_y_continuous(breaks= pretty_breaks()) +
+  labs(x = "School", y = "Defensive Efficiency", title = "Defensive Efficiency Impact Championship Game") +
+  coord_flip() +
+  theme(text = element_text(size = 6))
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,fig.width= 12,fig.height=9,fig.align = 'center'}
+#Average Blocks Impact Championship Game
+plot102 <- StatsImpact %>%
+  filter(Season == 2019 & TourneyRound == "Championship Game" & Win != "NA") %>%
+  ggplot(aes(x = reorder(TeamName,Blk), y = Blk,fill = Win)) +
+  geom_bar(stat = "identity", color = "black") +
+  scale_y_continuous(breaks= pretty_breaks()) +
+  labs(x = "School", y = "Blocks", title = "Average Blocks Impact Championship Game") +
+  coord_flip() +
+  theme(text = element_text(size = 6))
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,fig.width= 12,fig.height=9,fig.align = 'center'}
+#Average Assists Impact Championship Game
+plot103 <- StatsImpact %>%
+  filter(Season == 2019 & TourneyRound == "Championship Game" & Win != "NA") %>%
+  ggplot(aes(x = reorder(TeamName,Ast), y = Ast,fill = Win)) +
+  geom_bar(stat = "identity", color = "black") +
+  scale_y_continuous(breaks= pretty_breaks()) +
+  labs(x = "School", y = "Ast", title = "Average Assists Impact Championship Game") +
+  coord_flip() +
+  theme(text = element_text(size = 6))
+grid.arrange(plot98,plot99,plot100,plot101,plot102,plot103,ncol=3)
+```
+
+
+# Ranking Systems Impact on Tournament
+
+|        In order to try to improve accuracy in making correct predictions as to which team will win in the March Madness Tournament, there needs to be some other features besides game statistics that could be used in making predictions. This next section will focus on whether or not end of season rankings play any part in determining who will win or lose in each round of the tournament. Since there are countless college basketball ranking systems out there, there needs to be some way to select which ones to test. In this case, the three ranking systems with the most rankings will be utilized. This metric was chosen because the ranking systems with the most rankings will have the most historical data that could be analyzed. The table below shows the ranking systems with the most rankings. 
+
+
+```{r echo=FALSE, warning=FALSE, message=FALSE, fig.height=12,fig.width=8,fig.align="center"}
+
+MMasseyOrdinals %>%
+  group_by(SystemName) %>%
+  summarise(Amount = n()) %>%
+  arrange(desc(Amount)) %>%
+  rename(`Ranking Name` = "SystemName",`Number of Rankings` = "Amount") %>%
+  head(10) %>%
+  kable(align = "cc")
+
+```
+
+The three ranking systems that will be analyzed are Jeff Sagarin's (SAG), Sonny Moore's (MOR), and Ken Pomeroy's (POM) since those are the three ranking systems with the most rankings. 
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+MMasseyOrdinals <- MMasseyOrdinals %>%
+  filter((SystemName == "SAG" |
+            SystemName == "MOR" |
+            SystemName == "POM") &
+           Season >= 2009 & 
+           RankingDayNum == 133) %>%
+  pivot_wider(names_from = SystemName, values_from = OrdinalRank)
+  
+
+Rankings <- TourneyResults %>%
+  filter(Season >= 2009) %>%
+  left_join(MMasseyOrdinals, by = c("TeamID", "Season"))
+  
+
+Rank <- CompactResults %>%
+  filter(Season >= 2009) %>%
+  left_join(MMasseyOrdinals, by = c("Season", "WTeamID" = "TeamID")) %>%
+  left_join(MMasseyOrdinals, by = c("Season", "LTeamID" = "TeamID")) %>%
+  rename( MOR_win = "MOR.x",
+          POM_win = "POM.x",
+          SAG_win = "SAG.x",
+          MOR_lose = "MOR.y",
+          POM_lose = "POM.y",
+          SAG_lose = "SAG.y") %>%
+  select(Season:LScore, MOR_win:SAG_win, MOR_lose:SAG_lose) %>%
+  mutate(`MOR Higher Seed Win` = ifelse(MOR_win < MOR_lose, "Yes", "No")) %>%
+  mutate(`POM Higher Seed Win` = ifelse(POM_win < POM_lose, "Yes", "No")) %>%
+  mutate(`SAG Higher Seed Win` = ifelse(SAG_win < SAG_lose, "Yes", "No")) %>%
+  mutate(TourneyRound = ifelse(DayNum %in% c(134, 135), "Play in",
+                               ifelse(DayNum %in% c(136, 137), "First Round",
+                                      ifelse(DayNum %in% c(138, 139), "Second Round",
+                                             ifelse(DayNum %in% c(143, 144), "Sweet 16",
+                                                    ifelse(DayNum %in% c(145, 146), "Elite 8",
+                                                           ifelse(DayNum == 152, "Final Four", "Championship Game")))))))
+```
+
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+
+MOR <- Rank %>%
+  group_by(Season, `MOR Higher Seed Win`) %>%
+  summarise(Amount = n()) %>%
+  pivot_wider(names_from = `MOR Higher Seed Win`, values_from = Amount) %>%
+  mutate(Percentage = round(((Yes / (Yes + No))*100),1)) %>%
+  arrange(Season)
+
+POM <- Rank %>%
+  group_by(Season, `POM Higher Seed Win`) %>%
+  summarise(Amount = n()) %>%
+  pivot_wider(names_from = `POM Higher Seed Win`, values_from = Amount) %>%
+  mutate(Percentage = round(((Yes / (Yes + No))*100),1)) %>%
+  arrange(Season)
+
+SAG <- Rank %>%
+  group_by(Season, `SAG Higher Seed Win`) %>%
+  summarise(Amount = n()) %>%
+  pivot_wider(names_from = `SAG Higher Seed Win`, values_from = Amount) %>%
+  mutate(Percentage = round(((Yes / (Yes + No))*100),1)) %>%
+  arrange(Season) 
+
+higher_seed <- MOR %>%
+  left_join(POM, by = "Season") %>%
+  left_join(SAG, by = "Season") %>%
+  rename(MOR_Percent = "Percentage.x",
+         POM_Percent = "Percentage.y",
+         SAG_Percent = "Percentage") %>%
+  gather("Rankings","Percent", "MOR_Percent", "POM_Percent", "SAG_Percent")
+
+higher_seed$Rankings <- as.factor(higher_seed$Rankings)
+higher_seed$Season <- as.factor(higher_seed$Season)
+```
+
+
+The first thing that will be examined is which ranking system does a better job at predicting who will win each game in the tournament. The past 10 years (11 Seasons) are shown below. Notice that the three ranking systems oscillate as to which system will predict the games the best. Overall, it appears that SAG does the best job most of the time. However, POM is the most consistent out of the three ranking systems. Remember, this is historical data. It is difficult to know which of the three ranking systems will perform the best for this current tournament bracket. So maybe consistency (POM) is something that is really valuable to some people making predictions. 
+
+```{r echo=FALSE, warning=FALSE, message=FALSE, fig.align = 'center'}
+
+plot104 <- higher_seed %>%
+  ggplot(aes(x = Season, y = Percent, fill = Rankings)) +
+  geom_bar(stat="identity",color = "black", position = "dodge") +
+  scale_x_discrete(name = "Season") +
+  scale_y_continuous(name = "Percent") +
+  labs(x = "Year", y = "Percent", title = "Percent Higher Ranked Wins in Tournament") +
+  coord_flip()
+plot104
+```
+
+Next, the performance of each ranking system will be visualized through each round for last year's tournament, beginning in the first round. The perfect ranking system will have all red on top and all bluish/green on the bottom. This would indicate that all the higher ranked teams beat the lower ranked teams. The plots below show that POM does the best job at predicting the lowest ranked teams losing, but the other two (MOR & SAG) do a better job at predicting the highest ranked teams winning. However, analyzing the overall performance of all three systems in the first round, it appears they are pretty evenly matched. 
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,fig.width= 8,fig.align = 'center'}
+plot105 <- Rankings %>%
+  filter(Season == 2019 & TourneyRound == "First Round") %>%
+  ggplot(aes(x = reorder(TeamName,MOR), y = MOR,fill = Win)) +
+  geom_bar(stat = "identity", color = "black") +
+  scale_y_continuous(breaks= pretty_breaks()) +
+  labs(x = "School", y = "Ranking", title = "MOR Ranking Impact on First Round") +
+  coord_flip() +
+theme(text = element_text(size = 6))
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,fig.width= 6,fig.align = 'center'}
+plot106 <- Rankings %>%
+  filter(Season == 2019 & TourneyRound == "First Round") %>%
+  ggplot(aes(x = reorder(TeamName,POM), y = POM,fill = Win)) +
+  geom_bar(stat = "identity", color = "black") +
+  scale_y_continuous(breaks= pretty_breaks()) +
+  labs(x = "School", y = "Ranking", title = "POM Ranking Impact on First Round") +
+  coord_flip() +
+theme(text = element_text(size = 6))
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,fig.width= 8, fig.align = 'center'}
+plot107 <- Rankings %>%
+  filter(Season == 2019 & TourneyRound == "First Round") %>%
+  ggplot(aes(x = reorder(TeamName,SAG), y = SAG,fill = Win)) +
+  geom_bar(stat = "identity", color = "black") +
+  scale_y_continuous(breaks= pretty_breaks()) +
+  labs(x = "School", y = "Ranking", title = "SAG Ranking Impact on First Round") +
+  coord_flip() +
+theme(text = element_text(size = 6))
+grid.arrange(plot105,plot106,plot107, ncol = 3)
+```
+
+In the second round, POM now does the best job at predicting the highest ranked teams and SAG does the best at predicting the lowest ranked teams to lose. This round definitely has to go to POM though since there was only one incorrect decision made. Each ranking system is doing pretty well determining games through the first two rounds of the tournament overall. 
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,fig.width= 8,fig.align = 'center'}
+  plot108 <- Rankings %>%
+  filter(Season == 2019 & TourneyRound == "Second Round") %>%
+  ggplot(aes(x = reorder(TeamName,MOR), y = MOR,fill = Win)) +
+  geom_bar(stat = "identity", color = "black") +
+  scale_y_continuous(breaks= pretty_breaks()) +
+  labs(x = "School", y = "Ranking", title = "MOR Ranking Impact on Second Round") +
+  coord_flip() +
+  theme(text = element_text(size = 7))
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,fig.width= 8,fig.align = 'center'}
+  plot109 <- Rankings %>%
+  filter(Season == 2019 & TourneyRound == "Second Round") %>%
+  ggplot(aes(x = reorder(TeamName,POM), y = POM,fill = Win)) +
+  geom_bar(stat = "identity", color = "black") +
+  scale_y_continuous(breaks= pretty_breaks()) +
+  labs(x = "School", y = "Ranking", title = "POM Ranking Impact on Second Round") +
+  coord_flip() +
+  theme(text = element_text(size = 7))
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,fig.width= 8,fig.align = 'center'}
+  plot110 <- Rankings %>%
+  filter(Season == 2019 & TourneyRound == "Second Round") %>%
+  ggplot(aes(x = reorder(TeamName,SAG), y = SAG,fill = Win)) +
+  geom_bar(stat = "identity", color = "black") +
+  scale_y_continuous(breaks= pretty_breaks()) +
+  labs(x = "School", y = "Ranking", title = "SAG Ranking Impact on Second Round") +
+  coord_flip() +
+  theme(text = element_text(size = 7))
+grid.arrange(plot108,plot109,plot110, ncol = 3)
+```
+
+Below are the plots for the Sweet 16 and it appears that SAG rankings were the most useful in this round. There were three incorrect decisions for SAG this round, compared to four for POM and five for MOR. None of the ranking systems were able to predict the upset of North Carolina.
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,fig.width= 8,fig.align = 'center'}
+plot111 <- Rankings %>%
+  filter(Season == 2019 & TourneyRound == "Sweet 16") %>%
+  ggplot(aes(x = reorder(TeamName,MOR), y = MOR,fill = Win)) +
+  geom_bar(stat = "identity", color = "black") +
+  scale_y_continuous(breaks= pretty_breaks()) +
+  labs(x = "School", y = "Ranking", title = "MOR Ranking Impact on Sweet 16") +
+  coord_flip() +
+  theme(text = element_text(size = 7))
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,fig.width= 8,fig.align = 'center'}
+plot112 <- Rankings %>%
+  filter(Season == 2019 & TourneyRound == "Sweet 16") %>%
+  ggplot(aes(x = reorder(TeamName,POM), y = POM,fill = Win)) +
+  geom_bar(stat = "identity", color = "black") +
+  scale_y_continuous(breaks= pretty_breaks()) +
+  labs(x = "School", y = "Ranking", title = "POM Ranking Impact on Sweet 16") +
+  coord_flip() +
+  theme(text = element_text(size = 7))
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,fig.width= 8,fig.align = 'center'}
+plot113 <- Rankings %>%
+  filter(Season == 2019 & TourneyRound == "Sweet 16") %>%
+  ggplot(aes(x = reorder(TeamName,SAG), y = SAG,fill = Win)) +
+  geom_bar(stat = "identity", color = "black") +
+  scale_y_continuous(breaks= pretty_breaks()) +
+  labs(x = "School", y = "Ranking", title = "SAG Ranking Impact on Sweet 16") +
+  coord_flip() +
+  theme(text = element_text(size = 7))
+grid.arrange(plot111,plot112,plot113, ncol = 3)
+```
+
+
+Looking at the results of the Elite 8, again it is SAG that appears to be more accurate. While all three ranking systems had the same amount of wrong predictions, the SAG system had more bluish/green towards the bottom. This means SAG had more higher ranked teams beat the lower ranked teams. 
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,fig.width= 8,fig.align = 'center'}
+plot114 <- Rankings %>%
+  filter(Season == 2019 & TourneyRound == "Elite 8") %>%
+  ggplot(aes(x = reorder(TeamName,MOR), y = MOR,fill = Win)) +
+  geom_bar(stat = "identity", color = "black") +
+  scale_y_continuous(breaks= pretty_breaks()) +
+  labs(x = "School", y = "Ranking", title = "MOR Ranking Impact on Elite 8") +
+  coord_flip() +
+  theme(text = element_text(size = 7))
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,fig.width= 8,fig.align = 'center'}
+plot115 <- Rankings %>%
+  filter(Season == 2019 & TourneyRound == "Elite 8") %>%
+  ggplot(aes(x = reorder(TeamName,POM), y = POM,fill = Win)) +
+  geom_bar(stat = "identity", color = "black") +
+  scale_y_continuous(breaks= pretty_breaks()) +
+  labs(x = "School", y = "Ranking", title = "POM Ranking Impact on Elite 8") +
+  coord_flip() +
+  theme(text = element_text(size = 7))
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,fig.width= 8,fig.align = 'center'}
+plot116 <- Rankings %>%
+  filter(Season == 2019 & TourneyRound == "Elite 8") %>%
+  ggplot(aes(x = reorder(TeamName,SAG), y = SAG,fill = Win)) +
+  geom_bar(stat = "identity", color = "black") +
+  scale_y_continuous(breaks= pretty_breaks()) +
+  labs(x = "School", y = "Ranking", title = "SAG Ranking Impact on Elite 8") +
+  coord_flip() +
+  theme(text = element_text(size = 7))
+grid.arrange(plot114,plot115,plot116, ncol = 3)
+```
+
+
+The plots below show the results in the Final Four. POM and SAG performed evenly in this round as they had the same higher ranked teams lose and the same lower ranked teams win. 
+
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,fig.width= 8,fig.align = 'center'}
+plot117 <- Rankings %>%
+  filter(Season == 2019 & TourneyRound == "Final Four") %>%
+  ggplot(aes(x = reorder(TeamName,MOR), y = MOR,fill = Win)) +
+  geom_bar(stat = "identity", color = "black") +
+  scale_y_continuous(breaks= pretty_breaks()) +
+  labs(x = "School", y = "Ranking", title = "MOR Ranking Impact on Final Fou") +
+  coord_flip() +
+  theme(text = element_text(size = 7))
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,fig.width= 8,fig.align = 'center'}
+plot118 <- Rankings %>%
+  filter(Season == 2019 & TourneyRound == "Final Four") %>%
+  ggplot(aes(x = reorder(TeamName,POM), y = POM,fill = Win)) +
+  geom_bar(stat = "identity", color = "black") +
+  scale_y_continuous(breaks= pretty_breaks()) +
+  labs(x = "School", y = "Ranking", title = "POM Ranking Impact on Final Fou") +
+  coord_flip() +
+  theme(text = element_text(size = 7))
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,fig.width= 8,fig.align = 'center'}
+plot119 <- Rankings %>%
+  filter(Season == 2019 & TourneyRound == "Final Four") %>%
+  ggplot(aes(x = reorder(TeamName,SAG), y = SAG,fill = Win)) +
+  geom_bar(stat = "identity", color = "black") +
+  scale_y_continuous(breaks= pretty_breaks()) +
+  labs(x = "School", y = "Ranking", title = "SAG Ranking Impact on Final Fou") +
+  coord_flip() +
+  theme(text = element_text(size = 7))
+grid.arrange(plot117,plot118,plot119, ncol = 3)
+```
+
+Lastly, all three ranking systems were able to determine the national champion by their end of season rankings. This section showed that MOR, POM, and SAG could be useful features in a predictive model trying to determine the outcomes in the March Madness Tournament. None of the ranking systems have ever been perfect but the results do show that the higher ranked teams win the majority of the time. 
+
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,fig.width= 8,fig.align = 'center'}
+plot120 <- Rankings %>%
+  filter(Season == 2019 & TourneyRound == "Championship Game") %>%
+  ggplot(aes(x = reorder(TeamName,MOR), y = MOR,fill = Win)) +
+  geom_bar(stat = "identity", color = "black") +
+  scale_y_continuous(breaks= pretty_breaks()) +
+  labs(x = "School", y = "Ranking", title = "MOR Ranking Impact on Championship") +
+  coord_flip() +
+  theme(text = element_text(size = 7))
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,fig.width= 8,fig.align = 'center'}
+plot121 <- Rankings %>%
+  filter(Season == 2019 & TourneyRound == "Championship Game") %>%
+  ggplot(aes(x = reorder(TeamName,POM), y = POM,fill = Win)) +
+  geom_bar(stat = "identity", color = "black") +
+  scale_y_continuous(breaks= pretty_breaks()) +
+  labs(x = "School", y = "Ranking", title = "POM Ranking Impact on Championship") +
+  coord_flip() +
+  theme(text = element_text(size = 7))
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE,fig.width= 8,fig.align = 'center'}
+plot122 <- Rankings %>%
+  filter(Season == 2019 & TourneyRound == "Championship Game") %>%
+  ggplot(aes(x = reorder(TeamName,SAG), y = SAG,fill = Win)) +
+  geom_bar(stat = "identity", color = "black") +
+  scale_y_continuous(breaks= pretty_breaks()) +
+  labs(x = "School", y = "Ranking", title = "SAG Ranking Impact on Championship") +
+  coord_flip() +
+  theme(text = element_text(size = 7))
+grid.arrange(plot120,plot121,plot122, ncol = 3)
+```
+
+# Conclusion
+
+|        Hopefully, the visuals provided in this report are useful to anybody trying to predict a March Madness Bracket as accurately as possible. Key statistics are important, as it was seen that the teams that have won the most in the tournament all share similar performances in their statstics. However, statistics alone are not enough to predict accurate brackets. This is when it was seen that ranking systems were extremely valuable in trying to predict winners and losers. By combining statstics and a ranking system (MOR, POM, or SAG), a person should be able to improve their ability in predicting which teams will win and which will lose. 
+
+
+
