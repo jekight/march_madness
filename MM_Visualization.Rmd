@@ -15,14 +15,16 @@ knitr::opts_chunk$set(
 
 # Introduction
 
-|        The goal of any team, regardless of which sport the team plays, is to win the National Championship. In doing so, the team earns the right to claim that they are the number one team at that particular level. In men's college basketball, that means winning the March Madness Tournament. To get into the tournament a team must either win a division one conference (there are 32 division one conferences) or be selected by the NCAA Men's Division 1 Basketball Committee (36 teams or chosesn). In all, there are 68 teams that are in the tournament. Four teams are eliminated in the "play-in" round, leaving 64 teams split into four regions. In each region there are 16 teams that are given seeds 1 through 16. The tournament is single elimination and once each region has a winner, those winners play against each other until only one team remains. The tournament is a daunting task for any team. Once the tournament begins, anything can happen. In 1982, the term March Madness was coined to the tournament due to the major upsets and nail biting games. Now days, it is well known how chaotic the tournament is and in fact, it has turned into a challenge to try and predict the winner of every game. However, this is not an easy task since the odds of predicting all the games is roughly 1 in 9 quintillion! All across the United States, people implement different strategies in picking the winners. Some take a statistical approach, while others go off of gut feelings. Some individuals even go by mascots and/or team colors! All methods experience varying success. However, with improved technology and the understanding of data and how to use it, it may be possible to make better decisions when picking the winners in the March Madness Tournament.
+|        The goal of any team, regardless of sport, is winning the National Championship. In winning, the team claims victory and earns the right to call themselves better than all other competitors. In men's college basketball, winning means being the last team standing after the March Madness Tournament. To qualify for the tournament, a team must either win a Division I conference (32 total Division I conferences), or be selected by the NCAA Men's Division I Basketball Committee (36 teams are chosen). In all, 68 teams compete in the tournament. Four teams are eliminated in the "play-in" round, leaving 64 teams split into four regions. In each region, there are 16 teams, and each team is assigned a seed number 1 through 16. The tournament is single-elimination, and once each region has a winner, each winner plays against the others until only one team remains. The tournament is a daunting task for any team, and once the games begin, anything can happen.
 
-|        For the past few years, Kaggle has partnered with Google to provide a competition which focuses on trying to predict the NCAA March Madness Tournament by utilizing machine learning algorithms. On Kaggle's [website](https://www.kaggle.com/competitions), there are two different competitions concerning the NCAA March Madness bracket predictions: men's basketball and women's basketball. The analysis in this report will focus on men's basketball and what factors could potentially lead to a team's success in the NCAA Tournament. Overall, the main objectives are to determine which regular season statistics have the largest impact on tournament outcomes and show whether or not to factor in regular season rankings into game pick decisions. The analysis below will not guarantee a perfect bracket but it could enable an individual to make more educated predictions on various matchups throughout the tournament. The full code used to compile this report can be found [here](https://github.com/jekight/march_madness).
+|        In 1982, the term "March Madness" was coined to describe the tournament due to its characteristic upsets and nail-biting games. Today, attempting to predict the winner of each game in the chaotic match-up has become a fun challenge for fans across the nation. The odds of correctly predicting the outcome of each game is roughly 1 in 9 quintillion, but, viewers tackle the challenge regardless. Individuals implement unique strategies to pick the winners; some choose statistics, others, gut feeling, while still others look to mascots and/or team colors. While each method experiences a varying degree of success, the introduction of improved technology, alongside the understanding and application of data, may make it possible to more accurately select the March Madness Tournament winners.
+
+|        For the past few years, Kaggle has partnered with Google to host a competition around predicting the NCAA March Madness Tournament using machine learning algorithms. Kaggle's [website](https://www.kaggle.com/competitions) provides two different competitions concerning the NCAA March Madness bracket predictions: men's basketball and women's basketball. The analysis in this report focuses on men's basketball and identifying which factors, if any, could potentially lead to a team's success in the NCAA Tournament. The primary objectives are as follows: 1) determine which regular-season statistics have the largest impact on tournament outcomes and 2) show if regular-season rankings should be factored into game-pick decisions. The analysis below will not guarantee a perfect bracket, but it could result in more educated predictions for various match-ups throughout the tournament. The full code used to compile this report can be found [here](https://github.com/jekight/march_madness).
 
 
 # Successful Teams
 
-Before fully understanding the factors that make teams successful in the March Madness Tournament, the most successful teams must be identified. Of course, the ultimate success in the tournament is cutting down the nets after winning the national championship. Below is a table showing the last 15 teams crowned champions. 
+|        Before understanding the factors that make teams successful in the March Madness Tournament, the most successful teams must be identified. Of course, the ultimate success in the tournament is cutting down the nets after winning the national championship. Below is a table showing the last 15 teams crowned champions. 
 
 ``` {r echo=FALSE, results="hide"}
 library(tidyverse)
@@ -96,7 +98,8 @@ TourneyResults %>%
   kable(align = "cc")
 ```
 
-|        One thing to notice is that there are several teams that have won multiple championships. Teams like Duke, North Carolina, and Kentucky are known as powerhouse basketball schools and it is not uncommon for schools like these to go on successfull runs. Successful teams attract the best players because everyone wants the best chance to win a championship. It also gives those players more national recogniton, which means a chance to have higher draft positions (if their performance is exemplary). To get a better idea of which teams have won the most championships since 1985, as well as the teams that have lost the championship game, a simple bar graph can be constructed to compare the success of the schools.
+
+|        One thing to note is there are several teams that have won multiple championships. Teams like Duke, North Carolina, and Kentucky are known as powerhouse basketball schools, and it is not uncommon for schools like these to go on successful runs. Successful teams attract the best players because everyone wants the best chance to win a championship. It also gives those players more national recogniton, which means a chance to have higher draft positions (if their performance is exemplary). To better understand which teams have won the most championships since 1985, as well as the teams that have lost the championship game, a simple bar graph is constructed to compare the success of the schools.
 
 ```{r echo=FALSE, warning=FALSE, message=FALSE, fig.width = 10,fig.align = 'center'}
 #Create plot to show the schools with the most championships since 1985
@@ -125,7 +128,7 @@ plot2 <- TourneyResults %>%
 grid.arrange(plot1, plot2, ncol=2)
 ```
 
-There are a few key details in the graphs above. First, Duke has clearly been a force to be reckoned with in the tournament. Duke has the most championship wins during the selected timeframe and the second most loses in the championship game. This means that over a span of 35 years, Duke has been in the championship game 25% of the time. Second, the teams that have won the national championship are more likely to be in at least one other championship game. Meaning that out of all the division 1 basketball teams, only a small portion has demonstrated success in the tournament. This could be helpful, if the factors that make these teams successful can be identified. Next, the teams with the total amount of wins and losses in the tournament will be visualized. 
+There are a few key details in the graphs above. First, Duke has clearly been a force to be reckoned with in the tournament. Duke has the most championship wins during the selected timeframe and the second-most loses in the championship game. This means that, over a span of 35 years, Duke has been in the championship game 25% of the time. Second, the teams that have won the national championship are more likely to be in at least one other championship game. Meaning that, out of all the Division I basketball teams, only a small portion has demonstrated success in the tournament. This could be helpful if the factors that make these teams successful can be identified. Next, the teams with the total amount of wins and losses in the tournament will be visualized. 
 
 
 
@@ -159,7 +162,7 @@ plot4 <- TourneyResults %>%
 grid.arrange(plot3, plot4, ncol=2)
 ```
 
-The plot on the right, which shows the teams with the most tournament losses, really communicates which teams have made the most tournaments without winning the national championship. So a team like Kansas has over 80 wins but over 30 losses since 1985. Earlier it was revealed that Kansas has won two titles since 1985 but made it to five championships. Knowing this can be extremely valuable because obviously Kansas experiences success early on in the tournament but seems to struggle in the final rounds. Finding out the similarities and differences between a team like Kansas and a team like Duke could help in making predictions throughout the entire bracket.
+The plot on the right, which shows the teams with the most tournament losses, really communicates which teams have made the most tournaments without winning the national championship. A team like Kansas has over 80 wins, but over 30 losses since 1985. Earlier, it was revealed that Kansas has won two titles since 1985 but made it to five championships. Knowing this can be extremely valuable because Kansas experiences success early on in the tournament, but seems to struggle in the final rounds. Determining the similarities and differences between a team like Kansas and a team like Duke could help in making predictions throughout the entire bracket.
 
 
 ``` {r echo=FALSE, results="hide"}
@@ -177,6 +180,7 @@ TourneyResults$Seed <- as.factor(TourneyResults$Seed)
 ```
 
 # Seed and Region Performance
+
 
 |        Now that the successful schools have been identified, it is time to look at how the various tournament seeds have performed. Remember, there are four regions and each region contains 16 teams. This means that the seed numbers range from 1 through 16. The games in each region are matched with the highest seed (#1 seed) playing against the lowest seed (#16 seed) until all seeds have a match up. The plots below show which seeds have won and loss the most championship games.
 
@@ -206,7 +210,7 @@ plot6 <- TourneyResults %>%
 grid.arrange(plot5, plot6, ncol=2)
 ```
 
-It is no surprise the the number 1 seed has the most championship game wins. The number 1 seeds in the tournament are given to the top teams that basketball season. The best teams tend to win more often than not. Since 1985, the championship game has been filled mostly with teams ranked within the top three seeds. Notice that there are not any seeds outside of the top 8 that have played in the national championship. This is not to say that teams ranked 9 through 16 are not winning many games though. The plots below show the amount of tournament wins and losses for each seed. 
+It is no surprise the the number 1 seed has the most championship game wins. The number 1 seeds in the tournament are given to the top teams that basketball season. The best teams tend to win more often than not. Since 1985, the championship game has been filled mostly with teams ranked within the top three seeds. Notice that there are not any seeds outside of the top 8 that have played in the National Championship. This is not to say that teams ranked 9 through 16 are not winning many games though. The plots below show the amount of tournament wins and losses for each seed. 
 ```{r echo=FALSE, warning=FALSE, message=FALSE, fig.width= 10, fig.align = 'center'}
 
 #Plot to show which seeds have won the most since 1985
@@ -238,7 +242,7 @@ grid.arrange(plot7, plot8, ncol=2)
 
 ```
 
-Not surprisingly, seeds 1 through 8 have won the most tournament games, in their respective order. Seed 10 has won more games than seed 9 and seed 15 has been the worst performing seed, historically. Notice that some numbers have the letters "a" and "b" next to them. This is to signify that those teams were "play-in" teams. The variables were assigned based on Team ID number. It does not appear that being marked "a" or "b" made much impact on deciding who would win or lose in the "play-in" game. Remember that the bracket is split into four different regions. It is worth checking to see if one region has produced more champions than the other three.  
+|        Not surprisingly, seeds 1 through 8 have won the most tournament games, in their respective order. Historically, seed 10 has won more games than seed 9, and seed 15 has been the worst-performing seed. Notice that some numbers have the letters "a" and "b" next to them. This is to signify that those teams were "play-in" teams. The variables were assigned based on Team ID number. It does not appear that being marked "a" or "b" made much impact on deciding who would win or lose in the "play-in" game. Remember that the bracket is split into four different regions. It is worth checking to see if one region has produced more champions than the other three.  
 
 
 
@@ -262,7 +266,7 @@ Region X as produced only one more champion than the other regions but overall, 
 
 # Conference Performance
 
-|        So far, it has been identified that a hand full of teams have been much more successful in the tournament than the rest of the league. Then, to no surprise, the data shows that the higher a team is seeded in the tournament, the more that team will win. The four various regions did not differentiate the successful teams. However, maybe a team's conference will reveal something useful. In the NCAA, there are 32 different conferences. Each conference is made up of several schools that regularly compete against each other. Occasionally, schools will change conferences depending on a multitude of factors. Some conferences focus heavily on sports, such as the SEC. The SEC has historically produced very good football and baseball programs. Other conferences are known for other achievements in academics or fine arts. For example, the Ivy League Conference is not as well know for their sports as they are for their academics. There is a possibility that the conference a school belongs to could be useful in making predictions. The plots below show which conference has produced the most championship winners and losers since 1985.
+|        So far, it has been identified that a handfull of teams have been much more successful in the tournament than the rest of the league. Then, to no surprise, the data shows that the higher a team is seeded in the tournament, the more that team will win. The four various regions did not differentiate the successful teams. However, maybe a team's conference will reveal something useful. In the NCAA, there are 32 different conferences. Each conference is made up of several schools that regularly compete against each other. Occasionally, schools will change conferences depending on a multitude of factors. Some conferences focus heavily on sports, such as the SEC. The SEC has historically produced very good football and baseball programs. Other conferences are known for other achievements in academics or fine arts. For example, the Ivy League Conference is not as well know for their sports as they are for their academics. There is a possibility that the conference a school belongs to could be useful in making predictions. The plots below show which conferences have produced the most championship winners and losers since 1985.
 
 
 ```{r echo=FALSE, warning=FALSE, message=FALSE}
@@ -315,7 +319,7 @@ plot11 <- TourneyResults %>%
 plot11
 ```
 
-The Atlantic Coast Conference (ACC) and the Big East Conference have produced the most successful teams since 1985, with the ACC being slightly more successful. In fact, most of the champions since 1985 have come from one of these two conferences. Two other notable conferences include the Southeastern Conference (SEC) and the Big 10. Looking at the performance of the Big Ten (Big 10) in the championship game, shows that schools from the Big 10 make it to the championship quite often but fail to win the game that matters the most. Also, note that only a fraction of the conferences have made it to the championship game. This should at least be considered when making predictions. Below, will show how these conferences perform throughout the entire tournament.  
+|        The Atlantic Coast Conference (ACC) and the Big East Conference have produced the most successful teams since 1985, with the ACC being slightly more successful. In fact, most of the champions since 1985 have come from one of these two conferences. Two other notable conferences include the Southeastern Conference (SEC) and the Big Ten (Big 10). Looking at the performance of the Big 10 in the championship game, shows that schools from the Big 10 make it to the championship quite often but fail to win the game that matters the most. Also, note that only a fraction of the conferences have made it to the championship game. This should at least be considered when making predictions. Below will show how these conferences perform throughout the entire tournament.  
 
 ```{r echo=FALSE, warning=FALSE, message=FALSE, fig.width = 10,fig.align = 'center'}
 
@@ -356,7 +360,7 @@ When comparing national championships with tournament games, not a lot changes. 
 
 # Top Winning Percentages in Tournament Play
 
-|        Observing the total amount of wins and losses is useful but studying winning percentage may be more beneficial. Knowing a team's winning percentage will give a quantatative measurement during the preditive process. This measurement can be spanned over different time periods which will give different perspectives. For example, the plot below shows the top ten winning percentages in the tournament since 1985. However, before using these results to make predictions, remember that teams that occur in this list could have had very successful tournament runs in the 1980's and have not been relevant recently. This is not to say that the results cannot be useful, but it should be used carefully.
+|        Observing the total amount of wins and losses is useful, but studying winning percentage may be more beneficial. Knowing a team's winning percentage will give a quantitative measurement during the predictive process. This measurement can be spanned over different time periods which will give different perspectives. For example, the plot below shows the top ten winning percentages in the tournament since 1985. However, before using these results to make predictions, remember that teams that appear in this list could have had very successful tournament runs in the 1980's and have not been relevant recently. This is not to say that the results cannot be useful, but they should be used carefully.
 
 ```{r echo=FALSE, warning=FALSE, message=FALSE}
 
@@ -382,7 +386,7 @@ plot14 <- schoolwin[0:10,] %>%
 plot14
 ```
 
-One surprise revealed in the graph above is that Connecticut has the greatest winning percentage in the March Madness Tournament and not Duke. However, earlier it was shown that Duke had nearly twice as many wins in the tournament than Connecticut. Putting the information together communicates that Duke has been a top program for a long time and ,more times than not, will have a winning record in the tournament. A school like Connecticut may not participate in the tournament year after year but when they are in the tournament, they typically win the majority of their games. Notice that Loyola-Chicago has come out of nowhere to arrive on the list with the school with the highest winning percentage. One logical explaination for this is that Loyola-Chicago has not mad the tournament very often and in at least one of the years that they appeared in the tournament they won quite a few games but did not make it to the championship. Again, knowing which schools have performed well historically is helpful but it should only be used in conjuction with more recent statistics. The plot below displays the top ten winning percentages within the last ten years.
+|        One surprise revealed in the graph above is Connecticut has the greatest winning percentage in the March Madness Tournament, not Duke. However, earlier it was shown that Duke had nearly twice as many wins in the tournament than Connecticut. Putting the information together communicates that Duke has been a top program for a long time and, more times than not, will have a winning record in the tournament. A school like Connecticut may not participate in the tournament year after year, but when they are in the tournament, they typically win the majority of their games. Notice that Loyola-Chicago has come out of nowhere to arrive on the list with the school with the highest winning percentage. One logical explanation for this is Loyola-Chicago has not made the tournament very often, and, in at least one of the years they appeared in the tournament, they won quite a few games, but did not make it to the championship. Again, knowing which schools have performed well historically is helpful but it should only be used in conjuction with more recent statistics. The plot below displays the top ten winning percentages within the last ten years.
 
 ```{r echo=FALSE, warning=FALSE, message=FALSE}
 
@@ -409,10 +413,12 @@ plot15 <- schoolwin10[0:10,] %>%
 plot15
 ```
 
-Interestingly, Connecticut is still the top school in terms of winning percentage. At number two is South Carolina, which again is probably the result of at least one tournament in which they won the majority of their games. Also, Texas Tech is now on the list due to their championship run last year. While using a school's winning percentage as a feature probably won't carry much weight, it should at least be explored in a model as it could help in predicting tough matchups. 
+Interestingly, Connecticut is still the top school in terms of winning percentage. South Carolina is at number two, which again is most likely the result of at least one tournament in which they won the majority of their games. Also, Texas Tech is now on the list due to their championship run in 2019. While using a school's winning percentage as a factor probably won't carry much weight, it should at least be explored in a model as it could help in predicting tough match-ups. 
 
 
-|        The idea of this report was to find which statistics or characteristics the most successful teams in Division 1 basketball share. The plots above revealed which schools have historically experienced the most success in the tournament but it is difficult to differentiate the schools that are consistently good vs the schools with one ore two good years. Thus, the plot below displays the amount of wins vs number of losses in order to identify which teams have consistently been good. 
+
+|        The objective of this report was to identify which statistics or characteristics the most successful teams in Division I basketball share. The plots above revealed which schools have historically experienced the most success in the tournament, but it is difficult to differentiate the schools that are consistently good versus the schools with one or two good years. Thus, the plot below displays the amount of wins versus number of losses in order to identify which teams have consistently been good. 
+
 
 ```{r echo=FALSE, warning=FALSE, message=FALSE, fig.align = 'center'}
 
@@ -442,9 +448,9 @@ The plot above gives a better picture as to which teams should be highlighted wh
 These ten teams will be used to gauge what statstics have been the biggest factors that separates the winning teams from the losing teams. 
 
 
-# Identifying Team Statstics
+# Identifying Team Statistics
 
-Before comparing these ten teams, key statistics need to be identified. Instead of looking at data from 1985 to 2019, only the last 10 years will be observed. This is actually essential since the game of basketball changes throughout the years. The game use to be played much slower with a higher emphasis on defense but that no longer seems to be the case. The five statistics below are offensive based ranging from 2009 to 2019. The plots also highlight the differences between the averages of the winning and losing teams.
+|        Before comparing these ten teams, key statistics need to be identified. Instead of looking at data from 1985 to 2019, only the last 10 years will be observed. This is actually essential since the game of basketball changes throughout the years. The game use to be played much slower with a higher emphasis on defense but that no longer seems to be the case. The five statistics below are offensive based ranging from 2009 to 2019. The plots also highlight the differences between the averages of the winning and losing teams.
 
 
 ```{r echo=FALSE, warning=FALSE, message=FALSE}
@@ -543,7 +549,7 @@ plot22 <- TeamStats09 %>%
 grid.arrange(plot17, plot18, plot19, plot20,plot21,plot22, ncol=2)
 ```
 
-Starting with the average score of the winning and losing teams, there is no big surprise. The winning team must average more points because a team has to score more to win. However, the difference in score is pretty substantial. Approximately ten points separate the winning and losing team on average over the years. This connects directly with the average field goals made. In order to score more, a team has to make more field goals. Note that since 2016, teams are making much more field goals compared to seasons in the past. Next, the amount of three pointers made has increased significantly from 2016 and on. This change in offensive strategy could be attributed to the emergence of the Golden State Warriors and their success they experienced in the NBA by shooting and making three pointers at a high percentage. This stlye of play has permeated into college basketball and it appears that the winning teams are doing a better job making more three pointers. The amount of free throws made by both the winning and losing teams has decreased as the amount of three pointers increased. This could be due to the fact that when teams drive towards the basket, the potential to be fouled on the shot goes up. Since teams are driving towards the basket less and instead shooting three pointers, the opportunity to be fouled is reduced. Lastly, offensive rebounds seem to not be helpful. However, one hypothesis for the results displayed is that the winning team is making more of their shots compared to the losing team. Meaning that the losing team has more opportunities for offensive rebounds compared to the winning team. Lastly, the average amount of assists is much greater for the winning teams compared to the losing teams. The amount of assists has increased slightly since 2016 but not significantly. Next, the defensive statistics will be examined. 
+|        Starting with the average score of the winning and losing teams, there is no big surprise. The winning team must average more points because a team has to score more to win. However, the difference in score is pretty substantial. Approximately ten points separate the winning and losing team on average over the years. This connects directly with the average field goals made. In order to score more, a team has to make more field goals. Note that since 2016, teams are making much more field goals compared to seasons in the past. Next, the amount of three pointers made has increased significantly from 2016 and on. This change in offensive strategy could be attributed to the emergence of the Golden State Warriors and their success they experienced in the NBA by shooting and making three pointers at a high percentage. This stlye of play has permeated into college basketball and it appears that the winning teams are doing a better job making more three pointers. The amount of free throws made by both the winning and losing teams has decreased as the amount of three pointers increased. This could be due to the fact that when teams drive towards the basket, the potential to be fouled on the shot goes up. Since teams are driving towards the basket less and instead shooting three pointers, the opportunity to be fouled is reduced. Lastly, offensive rebounds seem to not be helpful. However, one hypothesis for the results displayed is that the winning team is making more of their shots compared to the losing team. Meaning that the losing team has more opportunities for offensive rebounds compared to the winning team. Lastly, the average amount of assists is much greater for the winning teams compared to the losing teams. The amount of assists has increased slightly since 2016 but not significantly. Next, the defensive statistics will be examined. 
 
 
 ```{r echo=FALSE, warning=FALSE, message=FALSE,fig.width= 12,fig.height=8,fig.align = 'center'}
@@ -621,12 +627,12 @@ plot27 <- TeamStats09 %>%
 grid.arrange(plot23, plot24, plot25, plot26,plot27, ncol=2)
 ```
 
-The first defensive statistic shows that defensive rebounds has a big difference between the winning and losing teams (almost 10 rebounds). This does make sense because the losing team is probably missing more shots, which gives the other team a chance to secure a defensive rebound. The next statistic is not exactly a defensive statistic (in fact, it is recorded based on the offensive team), however, it shows that the winning team commits less turnovers while forcing the other team to turn the ball over more. One of the key statistics for turnovers is steals, which the winning team does a better job doing. Also blocks is another statistic that leads to turnovers. While steals and blocks seem to favor the winning team heavily, after taking a closer look at the x-axis it actually is pretty close. Between the winner and loser only one block and one steal separates them. Still, this is an average over an entire season, so it makes sense that the averages are closer. At last, the amount of personal fouls committed by each team is much greater for the losing team. While this is partially due to sloppy defense, it could also be due to the fact that the losing team will intentionally foul the other team in order to control the game clock. Which results in the losing team committing more fouls than the winning team on average. 
+|        The first defensive statistic shows that defensive rebounds has a big difference between the winning and losing teams (almost 10 rebounds). This does make sense because the losing team is probably missing more shots, which gives the other team a chance to secure a defensive rebound. The next statistic is not exactly a defensive statistic (in fact, it is recorded based on the offensive team), however, it shows that the winning team commits less turnovers while forcing the other team to turn the ball over more. One of the key statistics for turnovers is steals, which the winning team does a better job doing. Also blocks is another statistic that leads to turnovers. While steals and blocks seem to favor the winning team heavily, after taking a closer look at the x-axis it actually is pretty close. Between the winner and loser only one block and one steal separates them. Still, this is an average over an entire season, so it makes sense that the averages are closer. At last, the amount of personal fouls committed by each team is much greater for the losing team. While this is partially due to sloppy defense, it could also be due to the fact that the losing team will intentionally foul the other team in order to control the game clock. Which results in the losing team committing more fouls than the winning team on average. 
 
 
-# Comparing Team Stats
+# Comparing Team Statistics
 
-Now that there is an idea of what key statistics the winning teams share during the season, it is time to see how the chosen teams compare with the rest of the league. Also, instead of taking the entire season into account, only the second half of the year will be considered. This will take into account the teams that started playing their best basketball right before the tournament. The idea is that teams that win in the tournament are probably playing better before the tournament starts and their performance carries over into the actual tournament. This could explain why small low seeded teams upset higher seeded teams. The plots below display the average score per game during the second half of the season for the years 2009, 2013, 2017, and 2019.
+|        Now that there is an idea of what key statistics the winning teams share during the season, it is time to see how the chosen teams compare with the rest of the league. Also, instead of taking the entire season into account, only the second half of the year will be considered. This will take into account the teams that started playing their best basketball right before the tournament. The idea is that teams that win in the tournament are probably playing better before the tournament starts and their performance carries over into the actual tournament. This could explain why small low seeded teams upset higher seeded teams. The plots below display the average score per game during the second half of the season for the years 2009, 2013, 2017, and 2019.
 
 ```{r echo=FALSE, warning=FALSE, message=FALSE}
 
@@ -894,7 +900,7 @@ grid.arrange(plot32,plot33,plot34,plot35)
 The plots above are interesting. In the years 2009 and 2013, it appeared there was a slight correlation between the amount of three pointers made vs the number of wins. However the years 2017 and 2019 do not show a correlation. This could be due to the majority of college teams playing with a similar strategy. Most teams now focus on three point shooting which is just making a more even playing field.
 
 
-The next statistic that will be examined is the Effective Field Goal Percentage (EFG%). This metric is similar to Field Goal Percentage, which measures the amount of made shots vs amount of missed shots. However, the EFG% takes into account three point percentage. This is useful because it was already seen earlier that more three pointers are being made every year (meaning more three point shots are being taken) and it is well known that three point shots are more difficult than two point shots. 
+|        The next statistic that will be examined is the Effective Field Goal Percentage (EFG%). This metric is similar to Field Goal Percentage, which measures the amount of made shots vs amount of missed shots. However, the EFG% takes into account three point percentage. This is useful because it was already seen earlier that more three pointers are being made every year (meaning more three point shots are being taken) and it is well known that three point shots are more difficult than two point shots. 
 
 ```{r echo=FALSE, warning=FALSE, message=FALSE,fig.width= 12,fig.height=8,fig.align = 'center'}
 #EFG% average per game month before tournament
@@ -1016,7 +1022,7 @@ grid.arrange(plot36,plot37,plot38,plot39, ncol = 2)
 There is a correlation between EFG% and number of wins experienced during the second half of the season. The higher a team's EFG%, the more wins that team typically will have. Looking at the ten selected teams with a high winning percentage in the tournament shows that to be successful in the tournament, a team needs to have a decent EFG%. This should be a feature when picking winners in a March Madness Bracket.
 
 
-Next, the amount of field goals attempted will be examined to see if this could be a useful feature in determining winners. As seen below, it does not appear that the amount of field goals taken relates to who wins and losses. There also is not really a pattern seen in the selected teams either. Thus, it would probably not be too useful is using the amount of field goals attempted to determine the future winners. 
+|        Next, the amount of field goals attempted will be examined to see if this could be a useful feature in determining winners. As seen below, it does not appear that the amount of field goals taken relates to who wins and losses. There also is not really a pattern seen in the selected teams either. Thus, it would probably not be too useful is using the amount of field goals attempted to determine the future winners. 
 ```{r echo=FALSE, warning=FALSE, message=FALSE,fig.width= 12,fig.height=8,fig.align = 'center'}
 #Field goals attempted per game month before tournament
 plot40 <- BeforeTourney %>%
@@ -1129,7 +1135,7 @@ Seeing how important offense is to the game of basketball at the moment, it is f
 
 $$Offensive\:Efficiency = \frac{Possessions}{Score}*100\%$$
 
-here the number of possessions can be found with the formula:
+where the number of possessions can be found with the formula:
 
 $$Possessions = {(Field Goals Attempted-Offensive Rebounds)+TurnOvers+(0.44*FreeThrowsAttempted)}$$
 Looking at the plots below, it appears that the lower the Offensive Efficiency the more wins a team will obtain. While this seems counterintuitive, some outside the box thinking must be applied. Looking at the formula for Offensive Efficiency shows Possessions in the numerator and Score in the denominator. This means that if possessions is greater than score, then the Offensive Efficiency will be greater than 100%. The ten teams with the highest winning percentage in the tournament had Offensive Efficiencies less that 100% (closer to 90%). This means that those teams were score more on less possessions, which is a characteristic of winning teams. Now the plots below make a little more sense.
@@ -2518,7 +2524,7 @@ plot105 <- Rankings %>%
   ggplot(aes(x = reorder(TeamName,MOR), y = MOR,fill = Win)) +
   geom_bar(stat = "identity", color = "black") +
   scale_y_continuous(breaks= pretty_breaks()) +
-  labs(x = "School", y = "Ranking", title = "MOR Ranking Impact on First Round") +
+  labs(x = "School", y = "Ranking", title = "MOR Ranking First Round") +
   coord_flip() +
 theme(text = element_text(size = 6))
 ```
@@ -2529,7 +2535,7 @@ plot106 <- Rankings %>%
   ggplot(aes(x = reorder(TeamName,POM), y = POM,fill = Win)) +
   geom_bar(stat = "identity", color = "black") +
   scale_y_continuous(breaks= pretty_breaks()) +
-  labs(x = "School", y = "Ranking", title = "POM Ranking Impact on First Round") +
+  labs(x = "School", y = "Ranking", title = "POM Ranking First Round") +
   coord_flip() +
 theme(text = element_text(size = 6))
 ```
@@ -2540,7 +2546,7 @@ plot107 <- Rankings %>%
   ggplot(aes(x = reorder(TeamName,SAG), y = SAG,fill = Win)) +
   geom_bar(stat = "identity", color = "black") +
   scale_y_continuous(breaks= pretty_breaks()) +
-  labs(x = "School", y = "Ranking", title = "SAG Ranking Impact on First Round") +
+  labs(x = "School", y = "Ranking", title = "SAG Ranking First Round") +
   coord_flip() +
 theme(text = element_text(size = 6))
 grid.arrange(plot105,plot106,plot107, ncol = 3)
@@ -2554,7 +2560,7 @@ In the second round, POM now does the best job at predicting the highest ranked 
   ggplot(aes(x = reorder(TeamName,MOR), y = MOR,fill = Win)) +
   geom_bar(stat = "identity", color = "black") +
   scale_y_continuous(breaks= pretty_breaks()) +
-  labs(x = "School", y = "Ranking", title = "MOR Ranking Impact on Second Round") +
+  labs(x = "School", y = "Ranking", title = "MOR Ranking Second Round") +
   coord_flip() +
   theme(text = element_text(size = 7))
 ```
@@ -2565,7 +2571,7 @@ In the second round, POM now does the best job at predicting the highest ranked 
   ggplot(aes(x = reorder(TeamName,POM), y = POM,fill = Win)) +
   geom_bar(stat = "identity", color = "black") +
   scale_y_continuous(breaks= pretty_breaks()) +
-  labs(x = "School", y = "Ranking", title = "POM Ranking Impact on Second Round") +
+  labs(x = "School", y = "Ranking", title = "POM Ranking Second Round") +
   coord_flip() +
   theme(text = element_text(size = 7))
 ```
@@ -2576,7 +2582,7 @@ In the second round, POM now does the best job at predicting the highest ranked 
   ggplot(aes(x = reorder(TeamName,SAG), y = SAG,fill = Win)) +
   geom_bar(stat = "identity", color = "black") +
   scale_y_continuous(breaks= pretty_breaks()) +
-  labs(x = "School", y = "Ranking", title = "SAG Ranking Impact on Second Round") +
+  labs(x = "School", y = "Ranking", title = "SAG Ranking Second Round") +
   coord_flip() +
   theme(text = element_text(size = 7))
 grid.arrange(plot108,plot109,plot110, ncol = 3)
@@ -2590,7 +2596,7 @@ plot111 <- Rankings %>%
   ggplot(aes(x = reorder(TeamName,MOR), y = MOR,fill = Win)) +
   geom_bar(stat = "identity", color = "black") +
   scale_y_continuous(breaks= pretty_breaks()) +
-  labs(x = "School", y = "Ranking", title = "MOR Ranking Impact on Sweet 16") +
+  labs(x = "School", y = "Ranking", title = "MOR Ranking Sweet 16") +
   coord_flip() +
   theme(text = element_text(size = 7))
 ```
@@ -2601,7 +2607,7 @@ plot112 <- Rankings %>%
   ggplot(aes(x = reorder(TeamName,POM), y = POM,fill = Win)) +
   geom_bar(stat = "identity", color = "black") +
   scale_y_continuous(breaks= pretty_breaks()) +
-  labs(x = "School", y = "Ranking", title = "POM Ranking Impact on Sweet 16") +
+  labs(x = "School", y = "Ranking", title = "POM Ranking Sweet 16") +
   coord_flip() +
   theme(text = element_text(size = 7))
 ```
@@ -2612,7 +2618,7 @@ plot113 <- Rankings %>%
   ggplot(aes(x = reorder(TeamName,SAG), y = SAG,fill = Win)) +
   geom_bar(stat = "identity", color = "black") +
   scale_y_continuous(breaks= pretty_breaks()) +
-  labs(x = "School", y = "Ranking", title = "SAG Ranking Impact on Sweet 16") +
+  labs(x = "School", y = "Ranking", title = "SAG Ranking Sweet 16") +
   coord_flip() +
   theme(text = element_text(size = 7))
 grid.arrange(plot111,plot112,plot113, ncol = 3)
@@ -2627,7 +2633,7 @@ plot114 <- Rankings %>%
   ggplot(aes(x = reorder(TeamName,MOR), y = MOR,fill = Win)) +
   geom_bar(stat = "identity", color = "black") +
   scale_y_continuous(breaks= pretty_breaks()) +
-  labs(x = "School", y = "Ranking", title = "MOR Ranking Impact on Elite 8") +
+  labs(x = "School", y = "Ranking", title = "MOR Ranking Elite 8") +
   coord_flip() +
   theme(text = element_text(size = 7))
 ```
@@ -2638,7 +2644,7 @@ plot115 <- Rankings %>%
   ggplot(aes(x = reorder(TeamName,POM), y = POM,fill = Win)) +
   geom_bar(stat = "identity", color = "black") +
   scale_y_continuous(breaks= pretty_breaks()) +
-  labs(x = "School", y = "Ranking", title = "POM Ranking Impact on Elite 8") +
+  labs(x = "School", y = "Ranking", title = "POM Ranking Elite 8") +
   coord_flip() +
   theme(text = element_text(size = 7))
 ```
@@ -2649,7 +2655,7 @@ plot116 <- Rankings %>%
   ggplot(aes(x = reorder(TeamName,SAG), y = SAG,fill = Win)) +
   geom_bar(stat = "identity", color = "black") +
   scale_y_continuous(breaks= pretty_breaks()) +
-  labs(x = "School", y = "Ranking", title = "SAG Ranking Impact on Elite 8") +
+  labs(x = "School", y = "Ranking", title = "SAG Ranking Elite 8") +
   coord_flip() +
   theme(text = element_text(size = 7))
 grid.arrange(plot114,plot115,plot116, ncol = 3)
@@ -2665,7 +2671,7 @@ plot117 <- Rankings %>%
   ggplot(aes(x = reorder(TeamName,MOR), y = MOR,fill = Win)) +
   geom_bar(stat = "identity", color = "black") +
   scale_y_continuous(breaks= pretty_breaks()) +
-  labs(x = "School", y = "Ranking", title = "MOR Ranking Impact on Final Fou") +
+  labs(x = "School", y = "Ranking", title = "MOR Ranking Final Fou") +
   coord_flip() +
   theme(text = element_text(size = 7))
 ```
@@ -2676,7 +2682,7 @@ plot118 <- Rankings %>%
   ggplot(aes(x = reorder(TeamName,POM), y = POM,fill = Win)) +
   geom_bar(stat = "identity", color = "black") +
   scale_y_continuous(breaks= pretty_breaks()) +
-  labs(x = "School", y = "Ranking", title = "POM Ranking Impact on Final Fou") +
+  labs(x = "School", y = "Ranking", title = "POM Ranking Final Fou") +
   coord_flip() +
   theme(text = element_text(size = 7))
 ```
@@ -2687,7 +2693,7 @@ plot119 <- Rankings %>%
   ggplot(aes(x = reorder(TeamName,SAG), y = SAG,fill = Win)) +
   geom_bar(stat = "identity", color = "black") +
   scale_y_continuous(breaks= pretty_breaks()) +
-  labs(x = "School", y = "Ranking", title = "SAG Ranking Impact on Final Fou") +
+  labs(x = "School", y = "Ranking", title = "SAG Ranking Final Fou") +
   coord_flip() +
   theme(text = element_text(size = 7))
 grid.arrange(plot117,plot118,plot119, ncol = 3)
@@ -2702,7 +2708,7 @@ plot120 <- Rankings %>%
   ggplot(aes(x = reorder(TeamName,MOR), y = MOR,fill = Win)) +
   geom_bar(stat = "identity", color = "black") +
   scale_y_continuous(breaks= pretty_breaks()) +
-  labs(x = "School", y = "Ranking", title = "MOR Ranking Impact on Championship") +
+  labs(x = "School", y = "Ranking", title = "MOR Ranking Championship") +
   coord_flip() +
   theme(text = element_text(size = 7))
 ```
@@ -2713,7 +2719,7 @@ plot121 <- Rankings %>%
   ggplot(aes(x = reorder(TeamName,POM), y = POM,fill = Win)) +
   geom_bar(stat = "identity", color = "black") +
   scale_y_continuous(breaks= pretty_breaks()) +
-  labs(x = "School", y = "Ranking", title = "POM Ranking Impact on Championship") +
+  labs(x = "School", y = "Ranking", title = "POM Ranking Championship") +
   coord_flip() +
   theme(text = element_text(size = 7))
 ```
@@ -2724,7 +2730,7 @@ plot122 <- Rankings %>%
   ggplot(aes(x = reorder(TeamName,SAG), y = SAG,fill = Win)) +
   geom_bar(stat = "identity", color = "black") +
   scale_y_continuous(breaks= pretty_breaks()) +
-  labs(x = "School", y = "Ranking", title = "SAG Ranking Impact on Championship") +
+  labs(x = "School", y = "Ranking", title = "SAG Ranking Championship") +
   coord_flip() +
   theme(text = element_text(size = 7))
 grid.arrange(plot120,plot121,plot122, ncol = 3)
