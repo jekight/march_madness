@@ -1902,9 +1902,9 @@ grid.arrange(plot60,plot61,plot62,plot63,plot64,plot65,plot66,plot67,ncol=2)
 ```
 
 
-# Statstics Impact on Tournament
+# Statistics Impact on Tournament
 
-|        Now it is time to see if the statisctics recorded the second half of the season before the tournament starts has any impacts on who wins and losses in each round of the tournament. Each round of last year's March Madness Tournament will be analyzed by key statistics to see which statistics do a better job of predicting who wins and who loses. The first group of plots show the impact each statistic had on which teams won and which teams lost. The bluish/green bars represent the winning teams and the red bars represent the losing teams. Judging by the results, it appears that Offensive Efficiency, Blocks, and Assists were the best statistics to use to predict the winners in the first round. The teams that averaged higher in those statistics were more successful compared to the other statistics.
+|        Now it is time to see if the statistics recorded the second half of the season before the tournament starts has any impacts on who wins and losses in each round of the tournament. Each round of last year's March Madness Tournament will be analyzed by key statistics to see which statistics do a better job of predicting who wins and who loses. The first group of plots show the impact each statistic had on which teams won and which teams lost. The bluish/green bars represent the winning teams and the red bars represent the losing teams. Judging by the results, it appears that Offensive Efficiency, Blocks, and Assists were the best statistics to use to predict the winners in the first round. The teams that averaged higher in those statistics were more successful compared to the other statistics.
 
 
 ```{r echo=FALSE, warning=FALSE, message=FALSE}
