@@ -209,6 +209,79 @@ TourneyResults <- TourneyResults[,c(1,4,51,2:3,7,29,8,30,9,31,5:6,10,32,
 write_csv(TourneyResults,"/Users/jeremykight/Desktop/R Directory/march_madness/TourneyResults.csv")
 
 
+#Normalize data
+TourneyNormal <- read_csv("TourneyResults.csv")
+
+normalize <- function(x) {
+  return ((x - min(x)) / (max(x) - min(x)))
+}
+
+TourneyNormal$POM.x  <- normalize(TourneyNormal$POM.x)
+TourneyNormal$POM.y  <- normalize(TourneyNormal$POM.y)
+
+TourneyNormal$Seed.x  <- normalize(TourneyNormal$Seed.x)
+TourneyNormal$Seed.y  <- normalize(TourneyNormal$Seed.y)
+
+TourneyNormal$Score.x  <- normalize(TourneyNormal$Score.x)
+TourneyNormal$Score.y  <- normalize(TourneyNormal$Score.y)
+
+TourneyNormal$FGA.x  <- normalize(TourneyNormal$FGA.x)
+TourneyNormal$FGA.y  <- normalize(TourneyNormal$FGA.y)
+
+TourneyNormal$FGM2.x  <- normalize(TourneyNormal$FGM2.x)
+TourneyNormal$FGM2.y  <- normalize(TourneyNormal$FGM2.y)
+
+TourneyNormal$FGM3.x  <- normalize(TourneyNormal$FGM3.x)
+TourneyNormal$FGM3.y  <- normalize(TourneyNormal$FGM3.y)
+
+TourneyNormal$avg3pt.x  <- normalize(TourneyNormal$avg3pt.x)
+TourneyNormal$avg3pt.y  <- normalize(TourneyNormal$avg3pt.y)
+
+TourneyNormal$EFG.x  <- normalize(TourneyNormal$EFG.x)
+TourneyNormal$EFG.y  <- normalize(TourneyNormal$EFG.y)
+
+TourneyNormal$FTA.x  <- normalize(TourneyNormal$FTA.x)
+TourneyNormal$FTA.y  <- normalize(TourneyNormal$FTA.y)
+
+TourneyNormal$OR.x  <- normalize(TourneyNormal$OR.x)
+TourneyNormal$OR.y  <- normalize(TourneyNormal$OR.y)
+
+TourneyNormal$TO.x  <- normalize(TourneyNormal$TO.x)
+TourneyNormal$TO.y  <- normalize(TourneyNormal$TO.y)
+
+TourneyNormal$Poss.x  <- normalize(TourneyNormal$Poss.x)
+TourneyNormal$Poss.y  <- normalize(TourneyNormal$Poss.y)
+
+TourneyNormal$Off.x  <- normalize(TourneyNormal$Off.x)
+TourneyNormal$Off.y  <- normalize(TourneyNormal$Off.y)
+
+TourneyNormal$Opp_Score.x  <- normalize(TourneyNormal$Opp_Score.x)
+TourneyNormal$Opp_Score.y  <- normalize(TourneyNormal$Opp_Score.y)
+
+TourneyNormal$Def_eff.x  <- normalize(TourneyNormal$Def_eff.x)
+TourneyNormal$Def_eff.y  <- normalize(TourneyNormal$Def_eff.y)
+
+TourneyNormal$Def_rating.x  <- normalize(TourneyNormal$Def_rating.x)
+TourneyNormal$Def_rating.y  <- normalize(TourneyNormal$Def_rating.y)
+
+TourneyNormal$Blk.x  <- normalize(TourneyNormal$Blk.x)
+TourneyNormal$Blk.y  <- normalize(TourneyNormal$Blk.y)
+
+TourneyNormal$DR.x  <- normalize(TourneyNormal$DR.x)
+TourneyNormal$DR.y  <- normalize(TourneyNormal$DR.y)
+
+TourneyNormal$Ast.x  <- normalize(TourneyNormal$Ast.x)
+TourneyNormal$Ast.y  <- normalize(TourneyNormal$Ast.y)
+
+TourneyNormal$Stl.x  <- normalize(TourneyNormal$Stl.x)
+TourneyNormal$Stl.y  <- normalize(TourneyNormal$Stl.y)
+
+TourneyNormal$PF.x  <- normalize(TourneyNormal$PF.x)
+TourneyNormal$PF.y  <- normalize(TourneyNormal$PF.y)
+
+#Save Dataframe
+write_csv(TourneyNormal,"/Users/jeremykight/Desktop/R Directory/march_madness/TourneyNormal.csv")
+
 
 
 
