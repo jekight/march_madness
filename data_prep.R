@@ -42,11 +42,11 @@ BeforeTourney$Opp_Win <- ifelse(BeforeTourney$Winner == 0, 1, 0)
 #Create column to show whether a game was won or not
 BeforeTourney$Opp_Lose <- ifelse(BeforeTourney$Winner == 1, 1, 0)
 
-#Filter Second half of Season
+#Filter from day 110
 BeforeTourney <- BeforeTourney %>%
   left_join(Teams, by = "TeamID") %>%
   select(Season:DayNum, WFGM:LPF,TeamID:Score, Winner:TeamName) %>%
-  filter(DayNum >= 75)
+  filter(DayNum >= 103)
 
 
 # Create dataframe for key statistics
@@ -109,16 +109,18 @@ Conferences <- Conferences %>%
 StatsImpact <- StatsImpact %>%
   left_join(Conferences, by = c("Season","TeamID"))
 
-#Filter MMasseyOrdinals for POM
-MMasseyOrdinals <- MMasseyOrdinals %>%
-  filter(SystemName == "POM" & RankingDayNum == 133)
+#Filter MMasseyOrdinals for POM last 20 days
+POM_last20 <- MMasseyOrdinals %>%
+  filter(SystemName == "POM" & RankingDayNum >= 110) %>%
+  group_by(Season,TeamID) %>%
+  summarise(POM = round(mean(OrdinalRank),1))
 
 #Join MMMassey Ordinals to StatsImpact
 StatsImpact <- StatsImpact %>%
-  left_join(MMasseyOrdinals, by = c("Season","TeamID"))
+  left_join(POM_last20, by = c("Season","TeamID"))
 
 #Reorder Columns
-StatsImpact <- StatsImpact[,c(1,22,2,26,29,3:21,23:25,27:28)]
+StatsImpact <- StatsImpact[,c(1,22,2,26,27,3:21,23:25)]
 
 #Take out unwanted columns
 StatsImpact <- StatsImpact %>%
@@ -197,7 +199,7 @@ TourneyResults <- TourneyResults %>%
 #Rename some columns
 TourneyResults <- TourneyResults %>%
   rename(Seed.x = "Seed_x", Seed.y = "Seed_y",Conference.x = "Description.x",
-         Conference.y = "Description.y", POM.x = "OrdinalRank.x", POM.y = "OrdinalRank.y")
+         Conference.y = "Description.y")
 
 #Reorder Columns
 TourneyResults <- TourneyResults[,c(1,4,51,2:3,7,29,8,30,9,31,5:6,10,32,
@@ -282,8 +284,32 @@ TourneyNormal$PF.y  <- normalize(TourneyNormal$PF.y)
 #Save Dataframe
 write_csv(TourneyNormal,"/Users/jeremykight/Desktop/R Directory/march_madness/TourneyNormal.csv")
 
+#Find the difference in features
+TourneyNormalDiff <- TourneyNormal %>%
+  mutate(POM_diff = POM.x - POM.y,
+         Seed_diff = Seed.x - Seed.y,
+         Score_diff = Score.x - Score.y,
+         FGA_diff = FGA.x - FGA.y,
+         FGM2_diff = FGM2.x - FGM2.y,
+         FGM3_dff = FGM3.x - FGM3.y,
+         Avg3pt_diff = avg3pt.x - avg3pt.y,
+         EFG_diff = EFG.x - EFG.y,
+         FTA_diff = FTA.x - FTA.y,
+         OR_diff = OR.x - OR.y,
+         TO_diff = TO.x - TO.y,
+         POSS_diff = Poss.x - Poss.y,
+         OFF_diff = Off.x - Off.y,
+         OPP_SCORE_diff = Opp_Score.x - Opp_Score.y,
+         DEF_EFF_diff = Def_eff.x - Def_eff.y,
+         BLK_diff = Blk.x - Blk.y,
+         DR_diff = DR.x - DR.y,
+         AST_diff = Ast.x - Ast.y,
+         STL_diff = Stl.x - Stl.y,
+         PF_diff = PF.x - PF.y)
 
-
-
-
-
+#Keep only selected columns
+TourneyNormalDiff <- TourneyNormalDiff %>%
+  select(Season:Conference.y,POM_diff:PF_diff)
+     
+#Save dataframe    
+write_csv(TourneyNormalDiff,"/Users/jeremykight/Desktop/R Directory/march_madness/TourneyDiff.csv")
