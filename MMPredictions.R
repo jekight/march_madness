@@ -52,7 +52,7 @@ fit.xgbTree <- train(Results~., data=Train1, method="xgbTree",metric=metric, trC
 #eXtreme Gradient Boosting Linear
 set.seed(3142)
 fit.xgbLM <- train(Results~., data=Train1, method="xgbLinear", metric=metric, trControl=control)
-#Neural Network nnet (decided to take out)
+#Neural Network nnet
 set.seed(3142)
 fit.nnet <- train(Results~., data=Train1, method="nnet",metric=metric, trControl=control)
 
@@ -100,8 +100,8 @@ plot(Importance3)
 
 Train2 <- RealGames %>%
   filter(Season <= 2018) %>%
-  select(Results,POM_diff:Score_diff, EFG_diff, OFF_diff, OPP_SCORE_diff,
-         DEF_EFF_diff,BLK_diff,AST_diff,STL_diff)
+  select(Results,POM_diff:Avg3pt_diff, OPP_SCORE_diff,
+         BLK_diff:PF_diff)
 
 #Make Results a factor
 Train2$Results <- as.factor(Train2$Results)
@@ -127,7 +127,7 @@ fit2.xgbTree <- train(Results~., data=Train2, method="xgbTree", metric=metric, t
 #eXtreme Gradient Boosting Linear
 set.seed(3142)
 fit2.xgbLM <- train(Results~., data=Train2, method="xgbLinear", metric=metric, trControl=control)
-#Neural Network nnet (decided to take out)
+#Neural Network nnet
 set.seed(3142)
 fit2.nnet <- train(Results~., data=Train2, method="nnet", metric=metric, trControl=control)
 
@@ -167,31 +167,14 @@ Importance3b <- varImp(fit2.nnet)
 plot(Importance3b)
 
 #####################################################################################################
-# SVM Tuning
-#####################################################################################################
-print(fit2.svm)
-svm_grid = expand.grid(sigma=c(0.06,0.07,0.08,0.09,1.0),C=c(0.25,0.5,0.75,1.0,1.25,1.5))
-svm_tune1 = train(Results~., data=Train2, method="svmRadial", metric=metric, 
-                  tuneGrid = svm_grid, trControl=control)
-print(svm_tune1)
-
-#svm_grid2 = expand.grid(sigma = 0.02, C = 0.25)
-#svm_tune2 = train(Results~., data=Train1, method="svmRadial", metric=metric, 
-#                  tuneGrid = svm_grid2, trControl=control)
-#print(svm_tune2)
-
-#See how well the model performs
-predsvm3 <- predict(svm_tune1, newdata = Test1, type = "raw")
-confusionMatrix(predsvm3, Test1$Results)
-
-#####################################################################################################
 # nnet Tuning
 #####################################################################################################
 
 print(fit.nnet)
+print(fit2.nnet)
 
-nnetgrid <- expand.grid(size = seq(from = 1, to = 10, by = 1),
-                        decay = c(0.5, 0.1, 1e-2, 1e-3, 1e-4, 1e-5, 1e-6, 1e-7))
+nnetgrid <- expand.grid(size = seq(from = 1, to = 5, by = 1),
+                        decay = c(0.25,0.2,0.15, 0.1,0.075))
 
 set.seed(3142)
 nnet_tune1 <- train(Results~., 
@@ -205,33 +188,25 @@ print(nnet_tune1)
 prednnet3 <- predict(nnet_tune1, newdata = Test1, type = "raw")
 confusionMatrix(prednnet3, Test1$Results)
 
-#####################################################################################################
-#SVM Logloss
-#####################################################################################################
+# Tune model with select freatures
 
-#Get the probalities for tuned svm
-probsvm3 <- predict(svm_tune1, newdata = Test1, type = "prob") %>%
-  select(2)
+set.seed(3142)
+nnet_tune2 <- train(Results~., 
+                    data=Train2, 
+                    method="nnet", 
+                    metric=metric, 
+                    trControl=control,
+                    tuneGrid = nnetgrid)
+print(nnet_tune2)
 
-
-EffectiveSVM <- RealGames %>%
-  filter(Season == 2019) %>%
-  mutate(Predictions = predsvm3) %>%
-  select(ID,Results,Predictions)
-
-EffectiveSVM <- cbind(EffectiveSVM,probsvm3) %>%
-  rename(Probability = "1")
-
-#Logloss for SVM model
-EffectiveSVM <- EffectiveSVM %>%
-  summarise(LogLoss = logLoss(Results,Probability),
-            Errors = sum(((Probability < 0.0)+(Probability > 1.0)+(is.na(Probability)))))
+prednnet4 <- predict(nnet_tune2, newdata = Test1, type = "raw")
+confusionMatrix(prednnet4, Test1$Results)
 
 #####################################################################################################
 #NNET Logloss
 #####################################################################################################
 
-#Get the probalities for tuned nnet
+#Get the probalities for nnet_tune1
 probnnet3 <- predict(nnet_tune1, newdata = Test1, type = "prob") %>%
   select(2)
 
@@ -250,3 +225,37 @@ EffectiveNNET <- EffectiveNNET %>%
             Errors = sum(((Probability < 0.0)+(Probability > 1.0)+(is.na(Probability)))))
 
 print(EffectiveNNET)
+
+#Get the probalities for nnet_tune1
+probnnet4 <- predict(nnet_tune2, newdata = Test1, type = "prob") %>%
+  select(2)
+
+
+EffectiveNNET2 <- RealGames %>%
+  filter(Season == 2019) %>%
+  mutate(Predictions = prednnet4) %>%
+  select(ID,Results,Predictions)
+
+EffectiveNNET2 <- cbind(EffectiveNNET2,probnnet4) %>%
+  rename(Probability = "1")
+
+#Logloss for NNET model
+EffectiveNNET2 <- EffectiveNNET2 %>%
+  summarise(LogLoss = logLoss(Results,Probability),
+            Errors = sum(((Probability < 0.0)+(Probability > 1.0)+(is.na(Probability)))))
+
+print(EffectiveNNET2)
+
+########################################################################################################
+#Save Model
+########################################################################################################
+
+save(nnet_tune1, file = "nnet_model.rda")
+
+load(file = "nnet_model.rda")
+print(nnet_tune1)
+
+
+
+
+
