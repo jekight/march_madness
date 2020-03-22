@@ -42,11 +42,11 @@ BeforeTourney$Opp_Win <- ifelse(BeforeTourney$Winner == 0, 1, 0)
 #Create column to show whether a game was won or not
 BeforeTourney$Opp_Lose <- ifelse(BeforeTourney$Winner == 1, 1, 0)
 
-#Filter from day 110
+#Filter from day 112
 BeforeTourney <- BeforeTourney %>%
   left_join(Teams, by = "TeamID") %>%
   select(Season:DayNum, WFGM:LPF,TeamID:Score, Winner:TeamName) %>%
-  filter(DayNum >= 103)
+  filter(DayNum >= 112)
 
 
 # Create dataframe for key statistics
@@ -207,12 +207,8 @@ TourneyResults <- TourneyResults[,c(1,4,51,2:3,7,29,8,30,9,31,5:6,10,32,
                                     17,39,18,40,19,41,20,42,21,43,22,44,
                                     23,45,24,46,25,47,26,48,27,49,28,50)]
 
-#Save Dataframe
-write_csv(TourneyResults,"/Users/jeremykight/Desktop/R Directory/march_madness/TourneyResults.csv")
-
-
-#Normalize data
-TourneyNormal <- read_csv("TourneyResults.csv")
+#Create new dataframe called TourneyNormal
+TourneyNormal <- TourneyResults
 
 normalize <- function(x) {
   return ((x - min(x)) / (max(x) - min(x)))
@@ -280,9 +276,6 @@ TourneyNormal$Stl.y  <- normalize(TourneyNormal$Stl.y)
 
 TourneyNormal$PF.x  <- normalize(TourneyNormal$PF.x)
 TourneyNormal$PF.y  <- normalize(TourneyNormal$PF.y)
-
-#Save Dataframe
-write_csv(TourneyNormal,"/Users/jeremykight/Desktop/R Directory/march_madness/TourneyNormal.csv")
 
 #Find the difference in features
 TourneyNormalDiff <- TourneyNormal %>%
